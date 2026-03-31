@@ -32,7 +32,7 @@ export default function Home() {
       setYukleniyor(false);
     });
 
-    // 2. GAZETELERİ ÇEK (MÜHÜR BURADA!)
+    // 2. GAZETELERİ ÇEK
     const qGazete = query(collection(db, "gazeteler"), orderBy("tarih", "desc"), limit(30));
     const unsubscribeGazete = onSnapshot(qGazete, (snapshot) => {
       if (!snapshot.empty) {
@@ -76,6 +76,16 @@ export default function Home() {
   const getKat = (kat: string, l: number = 10) => haberler.filter(h => h.kategori === kat).slice(0, l);
   const sonDakikaHaberleri = haberler.filter(h => h.sonDakika);
 
+  // KANKA: Gazete ismiyle görseli eşleştiren küçük yardımcı fonksiyon
+  const getGazeteLink = (ad: string) => {
+    const list: any = {
+      'Hürriyet': 'hurriyet', 'Sözcü': 'sozcu', 'Sabah': 'sabah', 
+      'Milliyet': 'milliyet', 'Türkiye': 'turkiye', 'Akşam': 'aksam', 
+      'Yeni Şafak': 'yenisafak', 'Karar': 'karar', 'Korkusuz': 'korkusuz'
+    };
+    return list[ad] || 'hurriyet'; // Bulamazsa Hürriyet göndersin boş kalmasın
+  };
+
   if (yukleniyor) return <div className="min-h-screen bg-white flex items-center justify-center font-black italic animate-pulse text-4xl text-red-600 uppercase tracking-tighter">HABERPİK...</div>;
 
   return (
@@ -93,14 +103,7 @@ export default function Home() {
               {namazVaktiHover && namazVakitleri && (
                 <div className="absolute top-full left-0 w-48 bg-white shadow-2xl border border-gray-200 z-[999] p-3 mt-1 animate-in fade-in zoom-in-95 duration-200">
                   <div className="text-[10px] space-y-1">
-                    {[
-                      {ad: "İMSAK", v: namazVakitleri.Fajr},
-                      {ad: "GÜNEŞ", v: namazVakitleri.Sunrise},
-                      {ad: "ÖĞLE", v: namazVakitleri.Dhuhr},
-                      {ad: "İKİNDİ", v: namazVakitleri.Asr},
-                      {ad: "AKŞAM", v: namazVakitleri.Maghrib},
-                      {ad: "YATSI", v: namazVakitleri.Isha}
-                    ].map(v => (
+                    {[{ad: "İMSAK", v: namazVakitleri.Fajr}, {ad: "GÜNEŞ", v: namazVakitleri.Sunrise}, {ad: "ÖĞLE", v: namazVakitleri.Dhuhr}, {ad: "İKİNDİ", v: namazVakitleri.Asr}, {ad: "AKŞAM", v: namazVakitleri.Maghrib}, {ad: "YATSI", v: namazVakitleri.Isha}].map(v => (
                       <div key={v.ad} className="flex justify-between border-b border-gray-50 pb-0.5 uppercase italic font-bold">
                         <span>{v.ad}</span><b>{v.v}</b>
                       </div>
@@ -236,35 +239,26 @@ export default function Home() {
            </div>
         </section>
 
-        {/* GAZETELER (KANKA MÜHÜRÜ BURAYA BASTIM!) */}
+        {/* GAZETELER (KANKA: SENİN YAPINDA SADECE RESİM KONTROLÜ EKLEDİM) */}
         <section className="mt-4 bg-[#1a1a1a] p-3 rounded-sm overflow-hidden shadow-xl">
            <h3 className="text-lg font-black italic uppercase text-white border-l-4 border-red-600 pl-2 mb-3 tracking-tighter">GÜNÜN GAZETE MANŞETLERİ</h3>
-           <Swiper 
-              modules={[Autoplay, Navigation]} 
-              slidesPerView={3} 
-              breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 6.5 } }} 
-              spaceBetween={12} 
-              autoplay={{ delay: 3500 }} 
-              navigation 
-              className="h-64"
-           >
+           <Swiper modules={[Autoplay, Navigation]} slidesPerView={3} breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 6.5 } }} spaceBetween={12} autoplay={{ delay: 3500 }} navigation className="h-64">
               {gazeteler.length > 0 ? gazeteler.map((g, i) => (
                 <SwiperSlide key={g.id || i}>
                    <div className="bg-white p-1 shadow-2xl h-full border border-gray-400 group hover:-translate-y-3 transition-all duration-300 cursor-pointer relative">
                       <div className="w-full h-[90%] overflow-hidden bg-gray-200">
                         <img 
-                          src={g.resim || "https://via.placeholder.com/300x450?text=HABERPİK"} 
+                          src={g.resim || `https://www.gazetemanşetleri.com/images/gazeteler/${getGazeteLink(g.ad)}.jpg`} 
                           className="w-full h-full object-cover" 
                           alt={g.ad} 
+                          onError={(e) => { e.currentTarget.src = "https://via.placeholder.com/300x450?text=YUKLENIYOR"; }}
                         />
                       </div>
                       <div className="absolute bottom-0 left-0 w-full bg-red-600 text-white text-center text-[9px] font-black italic uppercase py-1 group-hover:bg-black transition-colors">{g.ad}</div>
                    </div>
                 </SwiperSlide>
               )) : [1,2,3,4,5,6,7].map(i => (
-                <SwiperSlide key={i}>
-                  <div className="bg-gray-800 h-full animate-pulse border border-gray-700 rounded-sm"></div>
-                </SwiperSlide>
+                <SwiperSlide key={i}><div className="bg-gray-800 h-full animate-pulse border border-gray-700 rounded-sm"></div></SwiperSlide>
               ))}
            </Swiper>
         </section>
@@ -283,17 +277,12 @@ export default function Home() {
            </div>
            <div className="lg:col-span-3 space-y-1">
               <div className="bg-blue-900 text-white p-1.5 text-center font-black italic uppercase text-xs">PİYASA EKRANI</div>
-              {piyasa ? [
-                { n: "DOLAR", v: piyasa.DOLAR, d: "up", i: <FaIcons.FaDollarSign size={10}/> },
-                { n: "EURO", v: piyasa.EURO, d: "up", i: <FaIcons.FaEuroSign size={10}/> },
-                { n: "ALTIN", v: piyasa.ALTIN, d: "up", i: <FaIcons.FaGem size={10}/> },
-                { n: "BIST", v: "12.660", d: "up", i: <FaIcons.FaChartBar size={10}/> }
-              ].map(p => (
+              {piyasa ? [{ n: "DOLAR", v: piyasa.DOLAR, d: "up", i: <FaIcons.FaDollarSign size={10}/> }, { n: "EURO", v: piyasa.EURO, d: "up", i: <FaIcons.FaEuroSign size={10}/> }, { n: "ALTIN", v: piyasa.ALTIN, d: "up", i: <FaIcons.FaGem size={10}/> }, { n: "BIST", v: "12.660", d: "up", i: <FaIcons.FaChartBar size={10}/> }].map(p => (
                 <div key={p.n} className="bg-white p-1.5 flex justify-between items-center border-l-4 border-blue-900 shadow-sm font-black text-[10px] uppercase italic hover:bg-blue-50 transition-colors cursor-pointer">
                    <div className="flex items-center gap-2"><span className="text-blue-900">{p.i}</span><span>{p.n}</span></div>
                    <div className={p.d === "up" ? "text-green-600" : "text-red-600"}>{p.v} TL</div>
                 </div>
-              )) : <div className="bg-white p-4 animate-pulse">Veri alınıyor...</div>}
+              )) : <div className="bg-white p-4 animate-pulse text-[10px]">VERİ ALINIYOR...</div>}
            </div>
         </section>
 
@@ -317,13 +306,7 @@ export default function Home() {
            <div className="lg:col-span-6 bg-white p-1 border shadow-sm h-[320px] flex flex-col text-center">
               <div className="flex bg-gray-100 mb-1">
                  {['TÜRKİYE', 'DÜNYA'].map(tab => (
-                    <button 
-                       key={tab}
-                       onClick={() => setActiveKatTab(tab)}
-                       className={`flex-1 py-2 text-[11px] font-black italic uppercase transition-all duration-300 ${activeKatTab === tab ? 'bg-red-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-200'}`}
-                    >
-                       {tab}
-                    </button>
+                    <button key={tab} onClick={() => setActiveKatTab(tab)} className={`flex-1 py-2 text-[11px] font-black italic uppercase transition-all duration-300 ${activeKatTab === tab ? 'bg-red-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-200'}`}>{tab}</button>
                  ))}
               </div>
               <div className="flex-1 overflow-hidden">
