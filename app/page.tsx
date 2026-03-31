@@ -6,14 +6,14 @@ import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestor
 import Link from 'next/link';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Navigation, Pagination } from 'swiper/modules';
-import axios from 'axios'; // Kanka API'lar için bunu ekledim
+import axios from 'axios';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
 export default function Home() {
   const [haberler, setHaberler] = useState<any[]>([]);
-  const [gazeteler, setGazeteler] = useState<any[]>([]); // Gazeteler için state
+  const [gazeteler, setGazeteler] = useState<any[]>([]);
   const [havaDurumu, setHavaDurumu] = useState({ derece: "10", durum: "GÜNEŞLİ" });
   const [namazVakitleri, setNamazVakitleri] = useState<any>(null);
   const [piyasa, setPiyasa] = useState<any>(null);
@@ -23,7 +23,7 @@ export default function Home() {
   const [activeKatTab, setActiveKatTab] = useState('TÜRKİYE');
 
   useEffect(() => {
-    // 1. HABERLERİ ÇEK (Mevcut mantığın, dokunmadım kanka)
+    // 1. HABERLERİ ÇEK
     const q = query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(300));
     const unsubscribeHaber = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
@@ -32,15 +32,15 @@ export default function Home() {
       setYukleniyor(false);
     });
 
-    // 2. GAZETELERİ ÇEK (Botun bastığı gerçek manşetler buraya gelecek)
-    const qGazete = query(collection(db, "gazeteler"), orderBy("tarih", "desc"), limit(20));
+    // 2. GAZETELERİ ÇEK (MÜHÜR BURADA!)
+    const qGazete = query(collection(db, "gazeteler"), orderBy("tarih", "desc"), limit(30));
     const unsubscribeGazete = onSnapshot(qGazete, (snapshot) => {
       if (!snapshot.empty) {
         setGazeteler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }
     });
 
-    // 3. HAVA DURUMU - KOCAELİ (OTOMATİK)
+    // 3. HAVA DURUMU - KOCAELİ
     const fetchHava = async () => {
       try {
         const res = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=Kocaeli&units=metric&lang=tr&appid=8f27806f155940c6a394f4a36f4f2c0b`);
@@ -48,7 +48,7 @@ export default function Home() {
       } catch (e) { console.log("Hava durumu çekilemedi"); }
     };
 
-    // 4. NAMAZ VAKİTLERİ (OTOMATİK)
+    // 4. NAMAZ VAKİTLERİ
     const fetchNamaz = async () => {
       try {
         const res = await axios.get(`https://api.aladhan.com/v1/timingsByCity?city=Kocaeli&country=Turkey&method=13`);
@@ -56,15 +56,15 @@ export default function Home() {
       } catch (e) { console.log("Namaz vakti çekilemedi"); }
     };
 
-    // 5. DÖVİZ KURLARI (OTOMATİK)
+    // 5. DÖVİZ KURLARI
     const fetchPiyasa = async () => {
       try {
         const res = await axios.get(`https://api.exchangerate-api.com/v4/latest/USD`);
         const tryRate = res.data.rates.TRY;
         setPiyasa({
           DOLAR: tryRate.toFixed(2),
-          EURO: (tryRate * 1.08).toFixed(2), // Yaklaşık parite
-          ALTIN: (tryRate * 75).toFixed(0) // Gram altın tahmini
+          EURO: (tryRate * 1.08).toFixed(2),
+          ALTIN: (tryRate * 75).toFixed(0)
         });
       } catch (e) { console.log("Piyasa verisi çekilemedi"); }
     };
@@ -236,19 +236,35 @@ export default function Home() {
            </div>
         </section>
 
-        {/* GAZETELER (KANKA BURASI ARTIK GERÇEK!) */}
+        {/* GAZETELER (KANKA MÜHÜRÜ BURAYA BASTIM!) */}
         <section className="mt-4 bg-[#1a1a1a] p-3 rounded-sm overflow-hidden shadow-xl">
-           <h3 className="text-lg font-black italic uppercase text-white border-l-4 border-red-600 pl-2 mb-3 tracking-tighter">GAZETELER</h3>
-           <Swiper modules={[Autoplay, Navigation]} slidesPerView={3} breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 6.5 } }} spaceBetween={8} autoplay={{ delay: 3500 }} navigation className="h-52">
+           <h3 className="text-lg font-black italic uppercase text-white border-l-4 border-red-600 pl-2 mb-3 tracking-tighter">GÜNÜN GAZETE MANŞETLERİ</h3>
+           <Swiper 
+              modules={[Autoplay, Navigation]} 
+              slidesPerView={3} 
+              breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 6.5 } }} 
+              spaceBetween={12} 
+              autoplay={{ delay: 3500 }} 
+              navigation 
+              className="h-64"
+           >
               {gazeteler.length > 0 ? gazeteler.map((g, i) => (
-                <SwiperSlide key={i}>
-                   <div className="bg-white p-0.5 shadow-lg h-full border border-gray-300 hover:-translate-y-2 transition-transform duration-300">
-                      <img src={g.resim} className="w-full h-full object-cover" alt={g.ad} />
-                      <div className="bg-white text-center text-[8px] font-black italic uppercase py-1">{g.ad}</div>
+                <SwiperSlide key={g.id || i}>
+                   <div className="bg-white p-1 shadow-2xl h-full border border-gray-400 group hover:-translate-y-3 transition-all duration-300 cursor-pointer relative">
+                      <div className="w-full h-[90%] overflow-hidden bg-gray-200">
+                        <img 
+                          src={g.resim || "https://via.placeholder.com/300x450?text=HABERPİK"} 
+                          className="w-full h-full object-cover" 
+                          alt={g.ad} 
+                        />
+                      </div>
+                      <div className="absolute bottom-0 left-0 w-full bg-red-600 text-white text-center text-[9px] font-black italic uppercase py-1 group-hover:bg-black transition-colors">{g.ad}</div>
                    </div>
                 </SwiperSlide>
               )) : [1,2,3,4,5,6,7].map(i => (
-                <SwiperSlide key={i}><div className="bg-gray-800 h-full animate-pulse"></div></SwiperSlide>
+                <SwiperSlide key={i}>
+                  <div className="bg-gray-800 h-full animate-pulse border border-gray-700 rounded-sm"></div>
+                </SwiperSlide>
               ))}
            </Swiper>
         </section>
