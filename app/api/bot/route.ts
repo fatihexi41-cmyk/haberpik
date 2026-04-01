@@ -7,15 +7,14 @@ import xml2js from "xml2js";
 
 const bekle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// KANKA: BİK'in ve diğer sitelerin "Hotlink" engelini aşan süper fonksiyon
+// KANKA: Resmi her türlü engeli aşarak Base64'e çeviren canavar fonksiyon
 async function resmiBase64Cek(url: string) {
   try {
     const response = await axios.get(url, { 
       responseType: 'arraybuffer', 
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.bik.gov.tr/', 
-        'Origin': 'https://www.bik.gov.tr'
+        'Referer': 'https://www.gazeteoku.com/', // KANKA: Gazeteoku üzerinden geliyormuş gibi yapıyoruz
       },
       timeout: 10000 
     });
@@ -23,8 +22,8 @@ async function resmiBase64Cek(url: string) {
     const buffer = Buffer.from(response.data, 'binary');
     const mimeType = response.headers['content-type'] || 'image/jpeg';
     
-    // KANKA: Eğer gelen dosya o lanet olası "Stop" resmiyse (genelde 5KB altı olur) iptal et
-    if (buffer.length < 7000) return null;
+    // Eğer gelen veri o lanet "Stop" görseliyse veya boşsa iptal et
+    if (buffer.length < 10000) return null;
 
     return `data:${mimeType};base64,${buffer.toString('base64')}`;
   } catch (error) {
@@ -42,7 +41,7 @@ export async function GET() {
     const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ"]; 
     let toplamSayac = 0;
 
-    // --- BÖLÜM 1: HABERLER (Gemini 2.5-flash Görevde) ---
+    // --- BÖLÜM 1: HABERLER (Gemini 2.5-flash) ---
     for (const kat of kategoriler) {
       try {
         const rssRes = await axios.get(`https://news.google.com/rss/search?q=${kat.toLowerCase()}+türkiye&hl=tr&gl=TR&ceid=TR:tr`);
@@ -71,21 +70,20 @@ export async function GET() {
       } catch (e) { console.log(`${kat} haber hatası.`); }
     }
 
-    // --- BÖLÜM 2: GAZETELER (Çift Katmanlı Koruma) ---
+    // --- BÖLÜM 2: GAZETELER (GAZETEOKU ÜZERİNDEN GARANTİ MÜHÜR) ---
     const bugun = new Date();
-    const yil = bugun.getFullYear();
-    const ay = String(bugun.getMonth() + 1).padStart(2, '0');
-    const gun = String(bugun.getDate()).padStart(2, '0');
-    const bugunStr = `${gun}.${ay}.${yil}`;
+    const bugunStr = `${String(bugun.getDate()).padStart(2, '0')}.${String(bugun.getMonth() + 1).padStart(2, '0')}.${bugun.getFullYear()}`;
 
+    // KANKA: Gazeteoku'nun en sağlam sluglarını buraya mühürledim
     const gazeteListesi = [
       { ad: "Hürriyet", slug: "hurriyet" },
       { ad: "Sözcü", slug: "sozcu" },
       { ad: "Sabah", slug: "sabah" },
       { ad: "Milliyet", slug: "milliyet" },
-      { ad: "Özgür Kocaeli", slug: "kocaeli-ozgur-kocaeli", yedek: "ozgur-kocaeli" },
-      { ad: "Demokrat Kocaeli", slug: "kocaeli-demokrat-kocaeli", yedek: "demokrat-kocaeli" },
-      { ad: "Kocaeli Gazetesi", slug: "kocaeli-kocaeli", yedek: "kocaeli-gazetesi" }
+      { ad: "Türkiye", slug: "turkiye" },
+      { ad: "Özgür Kocaeli", slug: "ozgur-kocaeli" },
+      { ad: "Demokrat Kocaeli", slug: "demokrat-kocaeli" },
+      { ad: "Kocaeli Gazetesi", slug: "kocaeli-gazetesi" }
     ];
 
     let gazeteSayac = 0;
@@ -94,27 +92,24 @@ export async function GET() {
       const gSnap = await getDocs(gQuery);
       
       if (gSnap.empty) {
-        // 1. Yol: BİK üzerinden mühürlemeyi dene
-        const resimUrl = `https://www.bik.gov.tr/wp-content/uploads/mansetler/${yil}/${ay}/${gun}/${g.slug}-gazetesi-manseti.jpg`;
-        let base64Resim = await resmiBase64Cek(resimUrl);
-        
-        // 2. Yol: Eğer BİK engellediyse yedek kaynaktan (Gazeteoku) mühürle
-        if (!base64Resim) {
-          const yedekSlug = g.yedek || g.slug;
-          const yedekUrl = `https://www.gazeteoku.com/mansetler/${yedekSlug}.jpg`;
-          base64Resim = await resmiBase64Cek(yedekUrl);
-        }
+        // KANKA: Gazeteoku linki hotlink koruması yapmadığı için en garantisi bu!
+        const resimUrl = `https://www.gazeteoku.com/mansetler/${g.slug}.jpg`;
+        const base64Resim = await resmiBase64Cek(resimUrl);
         
         if (base64Resim) {
           await addDoc(collection(db, "gazeteler"), {
-            ad: g.ad, slug: g.slug, resim: base64Resim, tarih: new Date(), tarih_str: bugunStr
+            ad: g.ad, 
+            slug: g.slug, 
+            resim: base64Resim, 
+            tarih: new Date(), 
+            tarih_str: bugunStr
           });
           gazeteSayac++;
         }
       }
     }
 
-    return NextResponse.json({ mesaj: "Haberpik operasyonu başarıyla mühürlendi kanka!", haber: toplamSayac, gazete: gazeteSayac });
+    return NextResponse.json({ mesaj: "Bütün barikatlar yıkıldı kanka!", haber: toplamSayac, gazete: gazeteSayac });
 
   } catch (error: any) {
     return NextResponse.json({ hata: "Bot yoruldu: " + error.message }, { status: 500 });
