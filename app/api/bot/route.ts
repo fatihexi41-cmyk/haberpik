@@ -7,6 +7,23 @@ import xml2js from "xml2js";
 
 const bekle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// KANKA: BİK'in "Stop" engeline takılmamak için resmi Base64'e çeviren mühür fonksiyon
+async function resmiBase64Cek(url: string) {
+  try {
+    const response = await axios.get(url, { 
+      responseType: 'arraybuffer', 
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      timeout: 8000 // 8 saniye mühlet
+    });
+    const buffer = Buffer.from(response.data, 'binary');
+    const mimeType = response.headers['content-type'] || 'image/jpeg';
+    return `data:${mimeType};base64,${buffer.toString('base64')}`;
+  } catch (error) {
+    console.log("❌ Resim mühürlenemedi (BİK Engeli): " + url);
+    return null;
+  }
+}
+
 export async function GET() {
   const apiKey = "AIzaSyDBggv0wSkDkW_2b-IIoo47HBeJV_ZyBm8"; 
 
@@ -14,9 +31,7 @@ export async function GET() {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-    // KANKA: Botun yetişmesi için kategori sayısını şimdilik biraz azalttım, 
-    // her şey oturduğunda tekrar artırırız.
-    const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ", "SİYASET"];
+    const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ"]; // Hız için şimdilik 3 kategori
     let toplamSayac = 0;
 
     // --- BÖLÜM 1: HABERLER ---
@@ -25,7 +40,7 @@ export async function GET() {
         const rssRes = await axios.get(`https://news.google.com/rss/search?q=${kat.toLowerCase()}+türkiye&hl=tr&gl=TR&ceid=TR:tr`);
         const parser = new xml2js.Parser();
         const rssData = await parser.parseStringPromise(rssRes.data);
-        const items = rssData.rss.channel[0].item.slice(0, 1); // Her kategoriden 1 tane çeksin hızlansın
+        const items = rssData.rss.channel[0].item.slice(0, 1);
 
         for (const item of items) {
           const baslik = item.title[0];
@@ -45,10 +60,10 @@ export async function GET() {
             toplamSayac++;
           }
         }
-      } catch (e) { console.log(`${kat} çekilemedi, devam ediyorum...`); }
+      } catch (e) { console.log(`${kat} haber hatası.`); }
     }
 
-    // --- BÖLÜM 2: GAZETE MANŞETLERİ (HIZLI URL MODELİ) ---
+    // --- BÖLÜM 2: GAZETELER (BASE64 MÜHÜRÜ) ---
     const bugun = new Date();
     const yil = bugun.getFullYear();
     const ay = String(bugun.getMonth() + 1).padStart(2, '0');
@@ -59,14 +74,9 @@ export async function GET() {
       { ad: "Hürriyet", slug: "hurriyet" },
       { ad: "Sözcü", slug: "sozcu" },
       { ad: "Sabah", slug: "sabah" },
-      { ad: "Milliyet", slug: "milliyet" },
-      { ad: "Türkiye", slug: "turkiye" },
-      { ad: "Akşam", slug: "aksam" },
-      { ad: "Yeni Şafak", slug: "yenisafak" },
       { ad: "Özgür Kocaeli", slug: "kocaeli-ozgur-kocaeli" },
       { ad: "Demokrat Kocaeli", slug: "kocaeli-demokrat-kocaeli" },
-      { ad: "Kocaeli Gazetesi", slug: "kocaeli-kocaeli" },
-      { ad: "Çağdaş Kocaeli", slug: "kocaeli-cagdas-kocaeli" }
+      { ad: "Kocaeli Gazetesi", slug: "kocaeli-kocaeli" }
     ];
 
     let gazeteSayac = 0;
@@ -75,28 +85,21 @@ export async function GET() {
       const gSnap = await getDocs(gQuery);
       
       if (gSnap.empty) {
-        // KANKA: Base64 ile botu yormuyoruz, direkt linki basıyoruz ki 2 saniyede bitmesin
         const resimUrl = `https://www.bik.gov.tr/wp-content/uploads/mansetler/${yil}/${ay}/${gun}/${g.slug}-gazetesi-manseti.jpg`;
+        const base64Resim = await resmiBase64Cek(resimUrl);
         
-        await addDoc(collection(db, "gazeteler"), {
-          ad: g.ad, 
-          slug: g.slug, 
-          resim: resimUrl, 
-          tarih: new Date(), 
-          tarih_str: bugunStr
-        });
-        gazeteSayac++;
+        if (base64Resim) {
+          await addDoc(collection(db, "gazeteler"), {
+            ad: g.ad, slug: g.slug, resim: base64Resim, tarih: new Date(), tarih_str: bugunStr
+          });
+          gazeteSayac++;
+        }
       }
     }
 
-    return NextResponse.json({ 
-      mesaj: "Haberpik operasyonu başarılı!", 
-      eklenen_haber: toplamSayac,
-      eklenen_gazete: gazeteSayac 
-    });
+    return NextResponse.json({ mesaj: "Bütün engeller aşıldı kanka!", haber: toplamSayac, gazete: gazeteSayac });
 
   } catch (error: any) {
-    console.error("Bot hatası:", error.message);
-    return NextResponse.json({ hata: "Kanka bot yolda kaldı: " + error.message }, { status: 500 });
+    return NextResponse.json({ hata: "Bot yoruldu: " + error.message }, { status: 500 });
   }
 }
