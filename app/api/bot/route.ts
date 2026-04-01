@@ -7,31 +7,27 @@ import xml2js from "xml2js";
 
 const bekle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// KANKA: Bu fonksiyon BİK'e "Ben yabancı değilim" diyen gizli mühürdür.
+// KANKA: BİK'in ve diğer sitelerin "Hotlink" engelini aşan süper fonksiyon
 async function resmiBase64Cek(url: string) {
   try {
     const response = await axios.get(url, { 
       responseType: 'arraybuffer', 
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.bik.gov.tr/', // KANKA: BİK'e "Senin içinden geliyorum" diyoruz
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        'Referer': 'https://www.bik.gov.tr/', 
+        'Origin': 'https://www.bik.gov.tr'
       },
-      timeout: 12000 
+      timeout: 10000 
     });
     
     const buffer = Buffer.from(response.data, 'binary');
     const mimeType = response.headers['content-type'] || 'image/jpeg';
     
-    // Eğer gelen veri çok küçükse (Stop resmi gibi), hata sayalım kanka
-    if (buffer.length < 5000) {
-      console.log("⚠️ Çekilen resim çok küçük, muhtemelen engellendi.");
-      return null;
-    }
+    // KANKA: Eğer gelen dosya o lanet olası "Stop" resmiyse (genelde 5KB altı olur) iptal et
+    if (buffer.length < 7000) return null;
 
     return `data:${mimeType};base64,${buffer.toString('base64')}`;
   } catch (error) {
-    console.log("❌ Resim mühürlenemedi: " + url);
     return null;
   }
 }
@@ -46,7 +42,7 @@ export async function GET() {
     const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ"]; 
     let toplamSayac = 0;
 
-    // --- BÖLÜM 1: HABERLER ---
+    // --- BÖLÜM 1: HABERLER (Gemini 2.5-flash Görevde) ---
     for (const kat of kategoriler) {
       try {
         const rssRes = await axios.get(`https://news.google.com/rss/search?q=${kat.toLowerCase()}+türkiye&hl=tr&gl=TR&ceid=TR:tr`);
@@ -75,7 +71,7 @@ export async function GET() {
       } catch (e) { console.log(`${kat} haber hatası.`); }
     }
 
-    // --- BÖLÜM 2: GAZETELER ---
+    // --- BÖLÜM 2: GAZETELER (Çift Katmanlı Koruma) ---
     const bugun = new Date();
     const yil = bugun.getFullYear();
     const ay = String(bugun.getMonth() + 1).padStart(2, '0');
@@ -86,9 +82,10 @@ export async function GET() {
       { ad: "Hürriyet", slug: "hurriyet" },
       { ad: "Sözcü", slug: "sozcu" },
       { ad: "Sabah", slug: "sabah" },
-      { ad: "Özgür Kocaeli", slug: "kocaeli-ozgur-kocaeli" },
-      { ad: "Demokrat Kocaeli", slug: "kocaeli-demokrat-kocaeli" },
-      { ad: "Kocaeli Gazetesi", slug: "kocaeli-kocaeli" }
+      { ad: "Milliyet", slug: "milliyet" },
+      { ad: "Özgür Kocaeli", slug: "kocaeli-ozgur-kocaeli", yedek: "ozgur-kocaeli" },
+      { ad: "Demokrat Kocaeli", slug: "kocaeli-demokrat-kocaeli", yedek: "demokrat-kocaeli" },
+      { ad: "Kocaeli Gazetesi", slug: "kocaeli-kocaeli", yedek: "kocaeli-gazetesi" }
     ];
 
     let gazeteSayac = 0;
@@ -97,8 +94,16 @@ export async function GET() {
       const gSnap = await getDocs(gQuery);
       
       if (gSnap.empty) {
+        // 1. Yol: BİK üzerinden mühürlemeyi dene
         const resimUrl = `https://www.bik.gov.tr/wp-content/uploads/mansetler/${yil}/${ay}/${gun}/${g.slug}-gazetesi-manseti.jpg`;
-        const base64Resim = await resmiBase64Cek(resimUrl);
+        let base64Resim = await resmiBase64Cek(resimUrl);
+        
+        // 2. Yol: Eğer BİK engellediyse yedek kaynaktan (Gazeteoku) mühürle
+        if (!base64Resim) {
+          const yedekSlug = g.yedek || g.slug;
+          const yedekUrl = `https://www.gazeteoku.com/mansetler/${yedekSlug}.jpg`;
+          base64Resim = await resmiBase64Cek(yedekUrl);
+        }
         
         if (base64Resim) {
           await addDoc(collection(db, "gazeteler"), {
@@ -109,7 +114,7 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ mesaj: "Bütün engeller aşıldı kanka!", haber: toplamSayac, gazete: gazeteSayac });
+    return NextResponse.json({ mesaj: "Haberpik operasyonu başarıyla mühürlendi kanka!", haber: toplamSayac, gazete: gazeteSayac });
 
   } catch (error: any) {
     return NextResponse.json({ hata: "Bot yoruldu: " + error.message }, { status: 500 });
