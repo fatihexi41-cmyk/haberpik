@@ -7,19 +7,31 @@ import xml2js from "xml2js";
 
 const bekle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// KANKA: BİK'in "Stop" engeline takılmamak için resmi Base64'e çeviren mühür fonksiyon
+// KANKA: Bu fonksiyon BİK'e "Ben yabancı değilim" diyen gizli mühürdür.
 async function resmiBase64Cek(url: string) {
   try {
     const response = await axios.get(url, { 
       responseType: 'arraybuffer', 
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      timeout: 8000 // 8 saniye mühlet
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.bik.gov.tr/', // KANKA: BİK'e "Senin içinden geliyorum" diyoruz
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+      },
+      timeout: 12000 
     });
+    
     const buffer = Buffer.from(response.data, 'binary');
     const mimeType = response.headers['content-type'] || 'image/jpeg';
+    
+    // Eğer gelen veri çok küçükse (Stop resmi gibi), hata sayalım kanka
+    if (buffer.length < 5000) {
+      console.log("⚠️ Çekilen resim çok küçük, muhtemelen engellendi.");
+      return null;
+    }
+
     return `data:${mimeType};base64,${buffer.toString('base64')}`;
   } catch (error) {
-    console.log("❌ Resim mühürlenemedi (BİK Engeli): " + url);
+    console.log("❌ Resim mühürlenemedi: " + url);
     return null;
   }
 }
@@ -31,7 +43,7 @@ export async function GET() {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-    const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ"]; // Hız için şimdilik 3 kategori
+    const kategoriler = ["GÜNDEM", "SPOR", "EKONOMİ"]; 
     let toplamSayac = 0;
 
     // --- BÖLÜM 1: HABERLER ---
@@ -63,7 +75,7 @@ export async function GET() {
       } catch (e) { console.log(`${kat} haber hatası.`); }
     }
 
-    // --- BÖLÜM 2: GAZETELER (BASE64 MÜHÜRÜ) ---
+    // --- BÖLÜM 2: GAZETELER ---
     const bugun = new Date();
     const yil = bugun.getFullYear();
     const ay = String(bugun.getMonth() + 1).padStart(2, '0');
