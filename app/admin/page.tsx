@@ -1,13 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { db, auth, storage } from "@/lib/firebase"; // KANKA: storage buraya eklendi
+import { db, auth, storage } from "@/lib/firebase"; 
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import * as FaIcons from 'react-icons/fa';
 import { Line } from 'react-chartjs-2'; 
 import 'chart.js/auto';
-// KANKA: Video yükleme fonksiyonlarını buraya mühürledik
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
+// KANKA: Importları buraya sabitledim, build hatasını çözen kısım burası
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"; 
 
 export default function AdminPremiumV2() {
   const [user, setUser] = useState<any>(null);
@@ -16,7 +16,7 @@ export default function AdminPremiumV2() {
   const [haberler, setHaberler] = useState<any[]>([]);
   const [yorumlar, setYorumlar] = useState<any[]>([]); 
   const [mansetler, setMansetler] = useState<any[]>([]);
-  const [dikeyVideolar, setDikeyVideolar] = useState<any[]>([]); // KANKA: Dikey videolar için state
+  const [dikeyVideolar, setDikeyVideolar] = useState<any[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stats, setStats] = useState({ toplamHaber: 0, toplamOkunma: 0 });
 
@@ -31,7 +31,7 @@ export default function AdminPremiumV2() {
   });
 
   const [gazeteForm, setGazeteForm] = useState({ ad: '', resim: '' });
-  const [dikeyVideoForm, setDikeyVideoForm] = useState({ baslik: '', videoUrl: '', kapakResmi: '' }); // KANKA: Dikey video formu
+  const [dikeyVideoForm, setDikeyVideoForm] = useState({ baslik: '', videoUrl: '', kapakResmi: '' });
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -49,7 +49,6 @@ export default function AdminPremiumV2() {
         onSnapshot(query(collection(db, "mansetler"), orderBy("tarih", "desc")), (snap) => {
           setMansetler(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        // KANKA: Dikey videoları anlık dinliyoruz
         onSnapshot(query(collection(db, "dikey_videolar"), orderBy("tarih", "desc")), (snap) => {
           setDikeyVideolar(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
@@ -169,7 +168,6 @@ export default function AdminPremiumV2() {
           </form>
         )}
 
-        {/* KANKA: DİKEY VİDEO YÖNETİM SEKİSİ (VİDEO YÜKLEME MÜHÜRLENDİ) */}
         {tab === 'dikey-video' && (
            <div className="space-y-8">
               <div className="bg-white p-8 rounded-2xl border shadow-sm max-w-2xl font-black italic uppercase">
@@ -189,13 +187,9 @@ export default function AdminPremiumV2() {
     if(label) label.innerText = "YÜKLENİYOR... %0 ⏳";
 
     try {
-      // KANKA: Firebase Storage fonksiyonlarını jilet gibi buraya dikiyoruz
-      const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage");
-      const storage = getStorage();
-      
+      // KANKA: storage nesnesini direkt üstten kullanıyoruz artık
       const storageRef = ref(storage, `reels/${Date.now()}-${file.name}`);
       
-      // KANKA: En önemli kısım burası; metadata ekleyerek tarayıcıya güven veriyoruz
       const metadata = {
         contentType: 'video/mp4',
         cacheControl: 'public,max-age=3600',
@@ -210,7 +204,6 @@ export default function AdminPremiumV2() {
         }, 
         (error: any) => {
           console.error("YÜKLEME HATASI:", error);
-          // KANKA: Hata gelirse bize tam sebebini söyleyecek
           alert("HATA: " + error.code + "\nMesaj: " + error.message);
           if(label) label.innerText = "HATA OLUŞTU ❌";
         }, 
@@ -230,9 +223,7 @@ export default function AdminPremiumV2() {
                     </div>
 
                     <input required className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic uppercase" placeholder="VİDEO BAŞLIĞI" value={dikeyVideoForm.baslik} onChange={(e)=>setDikeyVideoForm({...dikeyVideoForm, baslik: e.target.value})} />
-                    
                     <input className="w-full p-4 bg-gray-50 border-none rounded-xl text-[10px] font-bold italic" placeholder="VİDEO URL (OTOMATİK DOLAR)" value={dikeyVideoForm.videoUrl} readOnly />
-                    
                     <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" placeholder="KAPAK RESMİ URL" value={dikeyVideoForm.kapakResmi} onChange={(e)=>setDikeyVideoForm({...dikeyVideoForm, kapakResmi: e.target.value})} />
                     
                     <button disabled={loading} className="bg-purple-600 text-white w-full py-4 rounded-xl hover:bg-black transition-all font-black italic uppercase">
