@@ -6,7 +6,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import * as FaIcons from 'react-icons/fa';
 import { Line } from 'react-chartjs-2'; 
 import 'chart.js/auto';
-// KANKA: Importları buraya sabitledim, build hatasını çözen kısım burası
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"; 
 
 export default function AdminPremiumV2() {
@@ -19,9 +18,31 @@ export default function AdminPremiumV2() {
   const [dikeyVideolar, setDikeyVideolar] = useState<any[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stats, setStats] = useState({ toplamHaber: 0, toplamOkunma: 0 });
+  const [iletisimMesajlari, setIletisimMesajlari] = useState<any[]>([]); // Gelen kutusu için
+// siteAyarlari state'inin içine şunları da ekle:
+// facebook: '', twitter: '', instagram: '', youtube: '', kunyeMetni: '', yayinIlkeleri: '', gizlilikSozlesmesi: ''
 
+  // KANKA: İstediğin Onay TV tarzı detaylı ayar yapısı burası
   const [siteAyarlari, setSiteAyarlari] = useState({
-    siteAdi: 'HABERPİK', logoUrl: '', whatsapp: '', footerMetin: '', reklam1: '', reklam2: ''
+    siteBasligi: 'Haberpik - Güvenilir Bilgi',
+    siteKisaBasligi: 'Haberpik',
+    siteAciklaması: '',
+    siteAnahtarKelimeler: '',
+    altbilgiMetni: '',
+    copyrightMetni: 'Copyright 2026 © Tüm Hakları Saklıdır.',
+    logoUrl: '',
+    faviconUrl: '',
+    anaRenk: '#ff0000',
+    whatsapp: '',
+    reklam1: '',
+    reklam2: '',
+    facebook: '',
+    twitter: '',
+    instagram: '',
+    youtube: '',
+    kunyeMetni: '',
+    yayinIlkeleri: '',
+    gizlilikSozlesmesi: ''
   });
 
   const [formData, setFormData] = useState({
@@ -52,8 +73,14 @@ export default function AdminPremiumV2() {
         onSnapshot(query(collection(db, "dikey_videolar"), orderBy("tarih", "desc")), (snap) => {
           setDikeyVideolar(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+        onSnapshot(query(collection(db, "iletisim_mesajlari"), orderBy("tarih", "desc")), (snap) => {
+  setIletisimMesajlari(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        onSnapshot(query(collection(db, "iletisim_mesajlari"), orderBy("tarih", "desc")), (snap) => {
+          setIletisimMesajlari(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+});
         getDoc(doc(db, "ayarlar", "genel")).then(docSnap => {
-          if (docSnap.exists()) setSiteAyarlari(docSnap.data() as any);
+          if (docSnap.exists()) setSiteAyarlari(prev => ({ ...prev, ...docSnap.data() }));
         });
       }
     });
@@ -98,6 +125,13 @@ export default function AdminPremiumV2() {
     setLoading(false);
   };
 
+  const mesajSil = async (id: string) => {
+    if(confirm("Mesajı çöpe atalım mı kanka? 🗑️")) {
+      await deleteDoc(doc(db, "iletisim_mesajlari", id));
+      alert("Mesaj imha edildi! 🔥");
+    }
+  };
+
   if (!user) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white font-black italic uppercase">Bağlanılıyor...</div>;
 
   return (
@@ -111,6 +145,7 @@ export default function AdminPremiumV2() {
           <button onClick={() => setTab('dikey-video')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'dikey-video' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaPlayCircle/> Dikey Video</button>
           <button onClick={() => setTab('yorum-yonetimi')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'yorum-yonetimi' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaComments/> Yorumlar</button>
           <button onClick={() => setTab('gazete-mansetleri')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'gazete-mansetleri' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaNewspaper/> Gazeteler</button>
+          <button onClick={() => setTab('mesajlar')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'mesajlar' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaInbox/> Gelen Kutusu</button>
           <button onClick={() => setTab('site-ayarlari')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'site-ayarlari' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaTools/> Ayarlar</button>
         </nav>
         <div className="p-6 border-t border-white/5"><button onClick={() => signOut(auth)} className="w-full text-red-500 font-black italic uppercase text-[10px] flex items-center justify-center gap-2"><FaIcons.FaSignOutAlt/> Çıkış</button></div>
@@ -187,14 +222,8 @@ export default function AdminPremiumV2() {
     if(label) label.innerText = "YÜKLENİYOR... %0 ⏳";
 
     try {
-      // KANKA: storage nesnesini direkt üstten kullanıyoruz artık
       const storageRef = ref(storage, `reels/${Date.now()}-${file.name}`);
-      
-      const metadata = {
-        contentType: 'video/mp4',
-        cacheControl: 'public,max-age=3600',
-      };
-
+      const metadata = { contentType: 'video/mp4', cacheControl: 'public,max-age=3600' };
       const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
       uploadTask.on('state_changed', 
@@ -267,30 +296,66 @@ export default function AdminPremiumV2() {
            </div>
         )}
 
-        {tab === 'site-ayarlari' && (
-          <div className="max-w-4xl bg-white p-8 rounded-2xl border shadow-sm font-black italic uppercase">
-             <h3 className="text-xl mb-8 border-b pb-4 flex items-center gap-2 text-red-600"><FaIcons.FaCogs/> Site Yönetimi</h3>
-             <form onSubmit={async (e) => { e.preventDefault(); setLoading(true); await setDoc(doc(db, "ayarlar", "genel"), siteAyarlari); alert("Ayarlar Mühürlendi!"); setLoading(false); }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                   <label className="text-[10px] text-gray-400">Site Adı</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.siteAdi} onChange={(e)=>setSiteAyarlari({...siteAyarlari, siteAdi: e.target.value})} />
-                   <label className="text-[10px] text-gray-400">Logo URL</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.logoUrl} onChange={(e)=>setSiteAyarlari({...siteAyarlari, logoUrl: e.target.value})} />
-                   <label className="text-[10px] text-gray-400">WhatsApp</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.whatsapp} onChange={(e)=>setSiteAyarlari({...siteAyarlari, whatsapp: e.target.value})} />
+        {/* KANKA: İSTEDİĞİN DETAYLI AYARLAR PANELİ BURADA */}
+{tab === 'site-ayarlari' && (
+          <div className="max-w-6xl bg-white p-8 rounded-3xl border shadow-sm font-black italic uppercase text-black space-y-10 pb-24">
+              <h3 className="text-2xl border-b pb-4 flex items-center gap-2 text-red-600 uppercase italic"><FaIcons.FaCogs/> Site Yönetim Merkezi</h3>
+              
+              <form onSubmit={async (e) => { e.preventDefault(); setLoading(true); await setDoc(doc(db, "ayarlar", "genel"), siteAyarlari); alert("Tüm Ayarlar Mühürlendi! 🚀 ✅"); setLoading(false); }} className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                
+                {/* SOL KOLON: GENEL & SOSYAL MEDYA */}
+                <div className="md:col-span-7 space-y-8">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1"><label className="text-[10px] text-gray-400 font-black">Site Başlığı (SEO)</label><input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.siteBasligi} onChange={(e)=>setSiteAyarlari({...siteAyarlari, siteBasligi: e.target.value})} /></div>
+                      <div className="space-y-1"><label className="text-[10px] text-gray-400 font-black">Site Kısa Adı</label><input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.siteKisaBasligi} onChange={(e)=>setSiteAyarlari({...siteAyarlari, siteKisaBasligi: e.target.value})} /></div>
+                    </div>
+
+                    <div className="space-y-1"><label className="text-[10px] text-gray-400 font-black">Site Açıklaması (Meta Description)</label><textarea className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic h-20" value={siteAyarlari.siteAciklaması} onChange={(e)=>setSiteAyarlari({...siteAyarlari, siteAciklaması: e.target.value})} /></div>
+
+                    {/* SOSYAL MEDYA PANELİ */}
+                    <div className="bg-gray-50 p-6 rounded-2xl space-y-4">
+                      <h4 className="text-xs text-blue-600 border-b pb-2 flex items-center gap-2"><FaIcons.FaShareAlt/> Sosyal Medya Linkleri</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border"><FaIcons.FaFacebook className="text-blue-700"/><input className="flex-1 bg-transparent text-[10px] outline-none normal-case font-bold" placeholder="Facebook Link" value={siteAyarlari.facebook || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, facebook: e.target.value})} /></div>
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border"><FaIcons.FaInstagram className="text-pink-600"/><input className="flex-1 bg-transparent text-[10px] outline-none normal-case font-bold" placeholder="Instagram Link" value={siteAyarlari.instagram || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, instagram: e.target.value})} /></div>
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border"><FaIcons.FaTwitter className="text-sky-500"/><input className="flex-1 bg-transparent text-[10px] outline-none normal-case font-bold" placeholder="Twitter Link" value={siteAyarlari.twitter || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, twitter: e.target.value})} /></div>
+                        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border"><FaIcons.FaYoutube className="text-red-600"/><input className="flex-1 bg-transparent text-[10px] outline-none normal-case font-bold" placeholder="Youtube Link" value={siteAyarlari.youtube || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, youtube: e.target.value})} /></div>
+                      </div>
+                    </div>
+
+                    {/* KURUMSAL METİNLER */}
+                    <div className="space-y-4 pt-4 border-t">
+                       <div className="space-y-1"><label className="text-[10px] text-red-600 font-black">KÜNYE METNİ</label><textarea className="w-full p-4 bg-gray-50 rounded-xl h-24 text-[11px] normal-case font-medium border" value={siteAyarlari.kunyeMetni || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, kunyeMetni: e.target.value})} /></div>
+                       <div className="space-y-1"><label className="text-[10px] text-red-600 font-black">YAYIN İLKELERİ</label><textarea className="w-full p-4 bg-gray-50 rounded-xl h-24 text-[11px] normal-case font-medium border" value={siteAyarlari.yayinIlkeleri || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, yayinIlkeleri: e.target.value})} /></div>
+                       <div className="space-y-1"><label className="text-[10px] text-red-600 font-black">GİZLİLİK SÖZLEŞMESİ</label><textarea className="w-full p-4 bg-gray-50 rounded-xl h-24 text-[11px] normal-case font-medium border" value={siteAyarlari.gizlilikSozlesmesi || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, gizlilikSozlesmesi: e.target.value})} /></div>
+                       <div className="space-y-1"><label className="text-[10px] text-red-600 font-black">KULLANIM ŞARTLARI</label><textarea className="w-full p-4 bg-gray-50 rounded-xl h-24 text-[11px] normal-case font-medium border" value={(siteAyarlari as any).kullanimSartlari || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, kullanimSartlari: e.target.value} as any)} /></div>
+                    </div>
                 </div>
-                <div className="space-y-4">
-                   <label className="text-[10px] text-gray-400">Reklam 1</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.reklam1} onChange={(e)=>setSiteAyarlari({...siteAyarlari, reklam1: e.target.value})} />
-                   <label className="text-[10px] text-gray-400">Reklam 2</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.reklam2} onChange={(e)=>setSiteAyarlari({...siteAyarlari, reklam2: e.target.value})} />
-                   <label className="text-[10px] text-gray-400">Footer Metni</label>
-                   <input className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic" value={siteAyarlari.footerMetin} onChange={(e)=>setSiteAyarlari({...siteAyarlari, footerMetin: e.target.value})} />
+
+                {/* SAĞ KOLON: LOGO, RENK & FOOTER */}
+                <div className="md:col-span-5 space-y-6">
+                    <div className="space-y-2"><label className="text-[10px] text-gray-400 font-black">LOGO URL</label><div className="flex gap-2"><input className="flex-1 p-4 bg-gray-50 rounded-xl font-bold italic text-[10px]" value={siteAyarlari.logoUrl} onChange={(e)=>setSiteAyarlari({...siteAyarlari, logoUrl: e.target.value})} />{siteAyarlari.logoUrl && <img src={siteAyarlari.logoUrl} className="h-12 w-12 object-contain bg-gray-100 rounded-xl border" />}</div></div>
+                    <div className="space-y-2"><label className="text-[10px] text-gray-400 font-black">FAVICON URL</label><input className="w-full p-4 bg-gray-50 rounded-xl font-bold text-[10px]" value={siteAyarlari.faviconUrl} onChange={(e)=>setSiteAyarlari({...siteAyarlari, faviconUrl: e.target.value})} /></div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-[10px] text-gray-400 font-black">TEMA ANA RENGİ</label><div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border"><input type="color" className="w-10 h-10 border-none bg-transparent cursor-pointer" value={siteAyarlari.anaRenk} onChange={(e)=>setSiteAyarlari({...siteAyarlari, anaRenk: e.target.value})} /><span className="text-[10px]">{siteAyarlari.anaRenk}</span></div></div>
+                      <div className="space-y-2"><label className="text-[10px] text-gray-400 font-black">WHATSAPP İHBAR</label><input className="w-full p-4 bg-gray-50 rounded-xl font-bold italic" value={siteAyarlari.whatsapp} onChange={(e)=>setSiteAyarlari({...siteAyarlari, whatsapp: e.target.value})} /></div>
+                    </div>
+
+                    <div className="space-y-2 pt-4 border-t">
+                       <label className="text-[10px] text-gray-400 font-black">ALT BİLGİ (FOOTER) METNİ</label>
+                       <input className="w-full p-4 bg-gray-50 rounded-xl font-bold italic" value={siteAyarlari.altbilgiMetni} onChange={(e)=>setSiteAyarlari({...siteAyarlari, altbilgiMetni: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] text-gray-400 font-black">COPYRIGHT METNİ</label>
+                       <input className="w-full p-4 bg-gray-50 rounded-xl font-bold italic" value={siteAyarlari.copyrightMetni} onChange={(e)=>setSiteAyarlari({...siteAyarlari, copyrightMetni: e.target.value})} />
+                    </div>
+
+                    <button disabled={loading} className="w-full bg-red-600 text-white py-6 rounded-2xl hover:bg-black transition-all font-black uppercase italic shadow-xl flex items-center justify-center gap-4 text-lg">
+                      {loading ? <FaIcons.FaSpinner className="animate-spin" /> : <><FaIcons.FaSave/> TÜMÜNÜ MÜHÜRLE</>}
+                    </button>
                 </div>
-                <button disabled={loading} className="md:col-span-2 bg-black text-white py-6 rounded-2xl hover:bg-red-600 transition-all font-black uppercase italic shadow-xl">
-                  {loading ? "İŞLENİYOR..." : "AYARLARI MÜHÜRLE"}
-                </button>
-             </form>
+              </form>
           </div>
         )}
 
@@ -327,6 +392,47 @@ export default function AdminPremiumV2() {
                  ))}
                </tbody>
              </table>
+           </div>
+        )}
+
+        {tab === 'mesajlar' && (
+           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden text-[11px] font-black italic uppercase text-black">
+             <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+                <h3 className="text-lg text-red-600 italic">📩 Gelen İletişim Mesajları</h3>
+                <span className="bg-red-600 text-white px-3 py-1 rounded-full text-[10px]">{iletisimMesajlari.length} MESAJ</span>
+             </div>
+             <table className="w-full text-left">
+               <thead className="bg-[#111] text-white">
+                 <tr>
+                   <th className="p-5">Gönderen / Tarih</th>
+                   <th className="p-5">İletişim Bilgisi</th>
+                   <th className="p-5">Konu / Mesaj</th>
+                   <th className="p-5 text-right">İşlem</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-gray-100">
+                 {iletisimMesajlari.map((m: any) => (
+                   <tr key={m.id} className="hover:bg-gray-50 transition-all">
+                     <td className="p-5 font-bold">
+                        <div className="text-red-600">{m.adSoyad}</div>
+                        <div className="text-gray-400 text-[9px]">{m.tarih?.toDate ? m.tarih.toDate().toLocaleString() : 'Yeni'}</div>
+                     </td>
+                     <td className="p-5 italic text-[10px]">
+                        <div>📧 {m.email}</div>
+                        <div>📱 {m.telefon || 'Yok'}</div>
+                     </td>
+                     <td className="p-5">
+                        <div className="text-blue-600 mb-1">{m.konu}</div>
+                        <div className="normal-case font-medium text-gray-700 line-clamp-2 max-w-xs">{m.mesaj}</div>
+                     </td>
+                     <td className="p-5 text-right">
+                        <button onClick={() => mesajSil(m.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-full transition-all text-lg"><FaIcons.FaTrashAlt/></button>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+             {iletisimMesajlari.length === 0 && <div className="p-10 text-center text-gray-400 italic">Henüz ihbar veya mesaj yok kanka! 😎</div>}
            </div>
         )}
       </main>
