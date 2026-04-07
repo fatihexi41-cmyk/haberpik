@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [havaDurumu, setHavaDurumu] = useState({ derece: "10", durum: "GÜNEŞLİ" });
   const [namazVakitleri, setNamazVakitleri] = useState<any>(null);
   const [namazVaktiHover, setNamazVaktiHover] = useState(false);
+  const [namazVaktiTiklandi, setNamazVaktiTiklandi] = useState(false); // KANKA: Tıklayınca açılma kilidi
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     logoUrl: '',
     whatsapp: '0532 449 03 81',
     footerMetin: "© 2026 HABERPİK MEDYA - TÜRKİYE'NİN HABER MERKEZİ",
-    siteAciklamasi: '', // KANKA: Admin panelinden gelen yeni açıklama buraya düşecek
+    siteAciklamasi: '',
     facebook: '', twitter: '', instagram: '', youtube: ''
   });
 
@@ -51,22 +52,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   useEffect(() => {
+    // KANKA: 1. Ayarları Dinle
     const unsubSettings = onSnapshot(doc(db, "ayarlar", "genel"), (doc) => {
-      if (doc.exists()) {
-        setSiteAyarlari(doc.data() as any);
-      }
+      if (doc.exists()) setSiteAyarlari(doc.data() as any);
     });
 
-    const fetchData = async () => {
-      try {
-        const hava = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=Kocaeli&units=metric&lang=tr&appid=8f27806f155940c6a394f4a36f4f2c0b`);
-        setHavaDurumu({ derece: Math.round(hava.data.main.temp).toString(), durum: hava.data.weather[0].description.toUpperCase() });
-        const namaz = await axios.get(`https://api.aladhan.com/v1/timingsByCity?city=Kocaeli&country=Turkey&method=13`);
-        setNamazVakitleri(namaz.data.data.timings);
-      } catch (e) { console.log("Header verileri çekilemedi"); }
+    // KANKA: 2. Botun güncellediği Namaz ve Hava Durumunu "Anlık" Dinle
+const unsubServices = onSnapshot(doc(db, "ayarlar", "hizmetler"), (doc) => {
+  if (doc.exists()) {
+    const data = doc.data();
+    // Bot hava durumu verisini girdiyse ekrana basıyoruz
+    if (data.hava) {
+      setHavaDurumu({
+        derece: data.hava.derece.toString(),
+        durum: data.hava.durum.toUpperCase()
+      });
+    }
+    if (data.namaz) setNamazVakitleri(data.namaz);
+  }
+});
+
+    return () => {
+      unsubSettings();
+      unsubServices();
     };
-    fetchData();
-    return () => unsubSettings();
   }, []);
 
   const toggleDarkMode = () => {
@@ -126,18 +135,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="flex items-center gap-1 text-green-600 border-r pr-4 border-gray-200/20"><FaIcons.FaWhatsapp size={14}/> {siteAyarlari.whatsapp}</span>
               <span className="flex items-center gap-1 border-r pr-4 border-gray-200/20"><FaIcons.FaCloudSun size={14} className="text-blue-400"/> KOCAELİ {havaDurumu.derece}° ({havaDurumu.durum})</span>
               
-              <div className="relative group" onMouseEnter={() => setNamazVaktiHover(true)} onMouseLeave={() => setNamazVaktiHover(false)}>
-                <span className={`flex items-center gap-1 cursor-pointer ${isDarkMode ? 'text-white' : 'text-gray-800'}`}><FaIcons.FaClock className="text-green-700"/> NAMAZ VAKİTLERİ</span>
-                {namazVaktiHover && namazVakitleri && (
-                  <div className={`absolute top-full left-0 w-48 shadow-2xl border z-[999] p-3 mt-1 animate-in fade-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-[#222] border-white/5' : 'bg-white border-gray-200'}`}>
-                    <div className="text-[10px] space-y-1">
-                      {[{ad: "İMSAK", v: namazVakitleri.Fajr}, {ad: "GÜNEŞ", v: namazVakitleri.Sunrise}, {ad: "ÖĞLE", v: namazVakitleri.Dhuhr}, {ad: "İKİNDİ", v: namazVakitleri.Asr}, {ad: "AKŞAM", v: namazVakitleri.Maghrib}, {ad: "YATSI", v: namazVakitleri.Isha}].map(v => (
-                        <div key={v.ad} className={`flex justify-between border-b pb-0.5 uppercase italic font-bold ${isDarkMode ? 'border-white/5 text-white' : 'border-gray-50 text-black'}`}><span>{v.ad}</span><b>{v.v}</b></div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* KANKA: Namaz Vakti Popup - Tıklama ve Hover beraber çalışır */}
+<div className="relative" 
+     onClick={(e) => { 
+       e.stopPropagation(); 
+       setNamazVaktiTiklandi(!namazVaktiTiklandi); 
+     }}
+     onMouseEnter={() => setNamazVaktiHover(true)} 
+     onMouseLeave={() => setNamazVaktiHover(false)}>
+  
+  <span className={`flex items-center gap-1 cursor-pointer select-none hover:text-green-600 transition-colors ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+    <FaIcons.FaClock className="text-green-700"/> NAMAZ VAKİTLERİ
+  </span>
+
+  {/* KANKA: Eğer tıklandıysa veya hover varsa popup çıksın */}
+  {(namazVaktiTiklandi || namazVaktiHover) && (
+    <div className={`absolute top-full left-0 w-52 shadow-[0_10px_30px_rgba(0,0,0,0.5)] border z-[9999] p-4 mt-2 rounded-md ${isDarkMode ? 'bg-[#222] border-white/20' : 'bg-white border-gray-300'}`}
+         onClick={(e) => e.stopPropagation()}>
+      {namazVakitleri ? (
+        <div className="text-[11px] space-y-2">
+          <div className="text-red-600 font-black border-b pb-1 mb-2 uppercase italic">Kocaeli Vakitleri</div>
+          {[
+            {ad: "İmsak", v: namazVakitleri.Fajr}, 
+            {ad: "Güneş", v: namazVakitleri.Sunrise}, 
+            {ad: "Öğle", v: namazVakitleri.Dhuhr}, 
+            {ad: "İkindi", v: namazVakitleri.Asr}, 
+            {ad: "Akşam", v: namazVakitleri.Maghrib}, 
+            {ad: "Yatsı", v: namazVakitleri.Isha}
+          ].map(v => (
+            <div key={v.ad} className={`flex justify-between border-b border-dashed pb-1 font-bold ${isDarkMode ? 'border-white/10 text-white' : 'border-gray-100 text-black'}`}>
+              <span className="text-gray-500 uppercase">{v.ad}</span>
+              <span className="font-black italic">{v.v}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[10px] font-bold text-red-600 animate-pulse italic">Vakitler Yükleniyor...</div>
+      )}
+    </div>
+  )}
+</div>
 
               <button onClick={toggleDarkMode} className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
                 {isDarkMode ? <FaIcons.FaSun className="text-yellow-500" size={16}/> : <FaIcons.FaMoon className="text-slate-700" size={16}/>}
@@ -159,7 +196,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center overflow-x-auto no-scrollbar">
               <Link href="/" className="px-3 py-3 bg-red-600 text-white"><FaIcons.FaHome size={18}/></Link>
               {["GÜNDEM", "SİYASET", "SPOR", "EKONOMİ", "ASAYİŞ", "DÜNYA", "TÜRKİYE HABERLERİ", "BİLİM TEKNOLOJİ"].map(m => (
-                <Link key={m} href={`/kategori/${m.toLowerCase().replace(/ /g, '-')}`} className="px-3 py-3 hover:bg-white/10 border-r border-white/5 whitespace-nowrap">{m}</Link>
+                <Link key={m} href={`/kategori/${m.toLowerCase().replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ /g, '-')}`} className="px-3 py-3 hover:bg-white/10 border-r border-white/5 whitespace-nowrap">{m}</Link>
               ))}
             </div>
             
@@ -196,7 +233,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <span className="font-black italic uppercase text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">İHBAR HATTI</span>
         </a>
 
-{/* 4. PREMIUM FOOTER - KANKA: BURASI ADMİN PANELİNE TAM BAĞLIDIR */}
+        {/* 4. PREMIUM FOOTER */}
         <footer className={`pt-16 pb-8 border-t-8 border-red-600 mt-10 transition-colors ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-[#0f0f0f]'}`}>
           <div className="max-w-[1150px] mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16 text-left">
@@ -214,7 +251,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </h2>
                 </Link>
                 
-                {/* KANKA: ADMİN PANELİNDEKİ "Site Açıklaması" BURAYA DÜŞER */}
                 <p className="text-gray-500 font-bold italic text-sm mb-8 leading-relaxed uppercase tracking-tighter max-w-sm">
                   {siteAyarlari.siteAciklamasi || siteAyarlari.footerMetin || "KOCAELİ'NİN DİNAMİK HABER MERKEZİ. GÜNCEL SİYASET, SPOR VE ASAYİŞ HABERLERİ."}
                 </p>
