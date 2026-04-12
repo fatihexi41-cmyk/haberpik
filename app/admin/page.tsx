@@ -19,6 +19,14 @@ export default function AdminPremiumV2() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stats, setStats] = useState({ toplamHaber: 0, toplamOkunma: 0 });
   const [iletisimMesajlari, setIletisimMesajlari] = useState<any[]>([]); // Gelen kutusu için
+  const [gazeteler, setGazeteler] = useState([]);
+  const [puanDurumu, setPuanDurumu] = useState([]);
+  const [fikstur, setFikstur] = useState([]);
+  const [havaDurumu, setHavaDurumu] = useState(null);
+  const [namazVakitleri, setNamazVakitleri] = useState(null);
+  const [filmler, setFilmler] = useState([]);
+  const [etkinlikler, setEtkinlikler] = useState([]);
+  const [kurlar, setKurlar] = useState(null);
 // siteAyarlari state'inin içine şunları da ekle:
 // facebook: '', twitter: '', instagram: '', youtube: '', kunyeMetni: '', yayinIlkeleri: '', gizlilikSozlesmesi: ''
 
@@ -46,39 +54,60 @@ export default function AdminPremiumV2() {
   });
 
   const [formData, setFormData] = useState({
-    baslik: '', ozet: '', icerik: '', resim: '', kategori: 'GÜNDEM',
-    mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false,
-    anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif'
-  });
+  baslik: '', ozet: '', icerik: '', resim: '', kategori: 'GÜNDEM',
+  mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false,
+  anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif',
+  icerikResimleri: [] as string[] // KANKA: İşte burası çoklu resim dizisi!
+});
+
+const [ekstraResimUrl, setEkstraResimUrl] = useState(''); // Input için geçici kutu
 
   const [gazeteForm, setGazeteForm] = useState({ ad: '', resim: '' });
   const [dikeyVideoForm, setDikeyVideoForm] = useState({ baslik: '', videoUrl: '', kapakResmi: '' });
 
-  useEffect(() => {
+useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (u) {
+        // 1. Haberler
         onSnapshot(query(collection(db, "haberler"), orderBy("tarih", "desc")), (snap) => {
           const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           setHaberler(list);
           const okunma = list.reduce((acc, curr: any) => acc + (curr.okunma || 0), 0);
           setStats({ toplamHaber: list.length, toplamOkunma: okunma });
         });
+
+        // 2. Yorumlar
         onSnapshot(query(collection(db, "yorumlar"), orderBy("tarih", "desc")), (snap) => {
           setYorumlar(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+
+        // 3. Elle Girilen Manşetler (Slayt)
         onSnapshot(query(collection(db, "mansetler"), orderBy("tarih", "desc")), (snap) => {
           setMansetler(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+
+// 4. BOTUN GETİRDİĞİ GAZETE MANŞETLERİ
+onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    // Yeni tanımladığımız state'lere veriyi basıyoruz
+    setGazeteler(data.gazeteMansetleri || []);
+    setPuanDurumu(data.lig_durumu || []);
+    setFikstur(data.super_lig_fikstur || []);
+    console.log("✅ Admin Paneli Bot Verileriyle Güncellendi!");
+  }
+});
+
+        // 5. Videolar ve Mesajlar
         onSnapshot(query(collection(db, "dikey_videolar"), orderBy("tarih", "desc")), (snap) => {
           setDikeyVideolar(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        onSnapshot(query(collection(db, "iletisim_mesajlari"), orderBy("tarih", "desc")), (snap) => {
-  setIletisimMesajlari(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+
         onSnapshot(query(collection(db, "iletisim_mesajlari"), orderBy("tarih", "desc")), (snap) => {
           setIletisimMesajlari(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-});
+
         getDoc(doc(db, "ayarlar", "genel")).then(docSnap => {
           if (docSnap.exists()) setSiteAyarlari(prev => ({ ...prev, ...docSnap.data() }));
         });
@@ -87,23 +116,50 @@ export default function AdminPremiumV2() {
     return () => unsubAuth();
   }, []);
 
-  const haberKaydet = async (e: React.FormEvent) => {
+const haberKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    const slugOlustur = (metin: string) => {
+      return metin.toLowerCase().trim()
+        .replace(/ /g, '-').replace(/ı/g, 'i').replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c');
+    };
+
+    // KANKA KONUM: Burası çok kritik. Ana sayfanın tanıdığı isimleri buraya mühürlüyoruz.
+    const mühürlüVeri = { 
+      ...formData, 
+      kategori_slug: slugOlustur(formData.kategori),
+      // ANA SAYFA FİLTRELERİ İÇİN EK MÜHÜRLER:
+      manset: formData.mansetEkle || false, 
+      slider: formData.sliderEkle || false,
+      guncellemeTarihi: new Date() 
+    };
+
     try {
       if (editingId) {
-        await updateDoc(doc(db, "haberler", editingId), { ...formData, guncellemeTarihi: new Date() });
-        alert("Güncellendi kanka! 💎");
+        await updateDoc(doc(db, "haberler", editingId), mühürlüVeri);
+        alert("Güncellendi ve mühürlendi kanka! 💎");
       } else {
-        await addDoc(collection(db, "haberler"), { ...formData, tarih: new Date(), okunma: 0 });
-        alert("Yayında kanka! 🚀");
+        await addDoc(collection(db, "haberler"), { 
+          ...mühürlüVeri, 
+          tarih: new Date(), 
+          okunma: 0 
+        });
+        alert("Yayında ve mühürlü kanka! 🚀");
       }
+      
+      // Formu temizle ve listeye dön
       setEditingId(null);
-      setFormData({ baslik: '', ozet: '', icerik: '', resim: '', kategori: 'GÜNDEM', mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false, anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif' });
+      setFormData({ baslik: '', ozet: '', icerik: '', resim: '', kategori: 'GÜNDEM', mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false, anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif',icerikResimleri: [] });
       setTab('haber-listesi');
-    } catch (err) { alert("Hata!"); }
-    setLoading(false);
-  };
+    } catch (err) { 
+      console.error(err);
+      alert("Hata oluştu kanka!"); 
+    } finally {
+      setLoading(false);
+    }
+  }; // İŞTE O MEŞHUR PARANTEZ BURADA KAPANMALI!
 
   const gazeteKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,7 +241,50 @@ export default function AdminPremiumV2() {
                     </div>
                   ))}
                 </div>
-                <select className="w-full p-4 bg-[#111] text-white rounded-xl text-xs outline-none cursor-pointer" value={formData.kategori} onChange={(e)=>setFormData({...formData, kategori: e.target.value})}>
+                {/* KANKA: İçerik Resimleri Ekleme Kutusu */}
+{/* KANKA: İÇERİK RESİMLERİ EKLEME KUTUSU BAŞLANGIÇ */}
+<div className="bg-gray-50 p-4 rounded-xl space-y-2 mt-4 border border-dashed border-gray-300">
+  <label className="text-[10px] font-black italic uppercase text-gray-500">HABER İÇİ RESİMLER (URL)</label>
+  <div className="flex gap-2">
+    <input 
+      className="flex-1 p-3 bg-white border rounded-lg text-xs font-bold" 
+      placeholder="Ekstra Resim URL Yapıştır..."
+      value={ekstraResimUrl}
+      onChange={(e) => setEkstraResimUrl(e.target.value)}
+    />
+    <button 
+      type="button"
+      onClick={() => {
+        if(ekstraResimUrl) {
+          setFormData({...formData, icerikResimleri: [...(formData.icerikResimleri || []), ekstraResimUrl]});
+          setEkstraResimUrl('');
+        }
+      }}
+      className="bg-blue-600 text-white px-4 rounded-lg text-[10px] font-black hover:bg-black transition-all"
+    >
+      EKLE
+    </button>
+  </div>
+  
+  {/* ÖNİZLEME ALANI */}
+  <div className="flex gap-2 mt-2 flex-wrap">
+    {formData.icerikResimleri?.map((url: string, index: number) => (
+      <div key={index} className="relative group">
+        <img src={url} className="w-16 h-16 object-cover rounded-lg border shadow-sm" alt="icerik" />
+        <button 
+          type="button"
+          onClick={() => {
+            const yeniDizi = formData.icerikResimleri?.filter((_, i) => i !== index) || [];
+            setFormData({...formData, icerikResimleri: yeniDizi});
+          }}
+          className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black shadow-md"
+        >
+          X
+        </button>
+      </div>
+    ))}
+  </div>
+</div> {/* KANKA: İŞTE O EKSİK KAPANIŞ ETİKETİ BURASIYDI! */}                <select className="w-full p-4 bg-[#111] text-white rounded-xl text-xs outline-none cursor-pointer" value={formData.kategori} onChange={(e)=>setFormData({...formData, kategori: e.target.value})}>
                   {[
                     "GÜNDEM", "SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", 
                     "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", 
@@ -360,24 +459,63 @@ export default function AdminPremiumV2() {
         )}
 
         {tab === 'haber-listesi' && (
-           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden text-xs font-bold uppercase italic">
-             <table className="w-full text-left">
-               <thead className="bg-[#111] text-white"><tr><th className="p-5">Görsel</th><th className="p-5">Başlık</th><th className="p-5 text-right">İşlem</th></tr></thead>
-               <tbody className="divide-y divide-gray-100">
-                 {haberler.map(h => (
-                   <tr key={h.id} className="hover:bg-gray-50">
-                     <td className="p-5">{h.resim ? <img src={h.resim} className="w-14 h-10 object-cover rounded shadow-sm" /> : <div className="w-14 h-10 bg-gray-100 flex items-center justify-center">YOK</div>}</td>
-                     <td className="p-5 truncate max-w-md">{h.baslik}</td>
-                     <td className="p-5 text-right flex justify-end gap-2 text-lg">
-                       <button onClick={() => {setEditingId(h.id); setFormData({...h} as any); setTab('haber-ekle');}} className="text-blue-500 p-2"><FaIcons.FaEdit/></button>
-                       <button onClick={() => deleteDoc(doc(db, "haberler", h.id))} className="text-red-500 p-2"><FaIcons.FaTrashAlt/></button>
-                     </td>
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
-           </div>
-        )}
+  <div className="bg-white rounded-2xl border shadow-sm overflow-hidden text-xs font-bold uppercase italic text-black">
+    <table className="w-full text-left">
+      <thead className="bg-[#111] text-white">
+        <tr>
+          <th className="p-5">Görsel</th>
+          <th className="p-5">Başlık</th>
+          <th className="p-5 text-right">İşlem</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {haberler.map(h => (
+          <tr key={h.id} className="hover:bg-gray-50 transition-colors">
+            <td className="p-5">
+              {h.resim ? (
+                <img src={h.resim} className="w-14 h-10 object-cover rounded shadow-sm border" alt="haber" />
+              ) : (
+                <div className="w-14 h-10 bg-gray-100 flex items-center justify-center text-[8px] text-gray-400 rounded border border-dashed">YOK</div>
+              )}
+            </td>
+            <td className="p-5 truncate max-w-md font-bold">{h.baslik}</td>
+            <td className="p-5 text-right flex justify-end gap-2 text-lg">
+              {/* KANKA: İŞTE O KRİTİK DÜZENLEME BURADA! */}
+              <button 
+                onClick={() => {
+                  setEditingId(h.id); 
+                  // Kanka: h.icerikResimleri yoksa || [] diyerek TypeScript'i susturuyoruz ve sistemi koruyoruz
+                  setFormData({ 
+                    ...h, 
+                    icerikResimleri: h.icerikResimleri || [] 
+                  } as any); 
+                  setTab('haber-ekle');
+                }} 
+                className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-all"
+              >
+                <FaIcons.FaEdit/>
+              </button>
+              
+              <button 
+                onClick={() => {
+                  if(confirm("Bu haberi mühürden silelim mi kanka?")) {
+                    deleteDoc(doc(db, "haberler", h.id));
+                  }
+                }} 
+                className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+              >
+                <FaIcons.FaTrashAlt/>
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {haberler.length === 0 && (
+      <div className="p-10 text-center text-gray-400 italic">Henüz haber yok kanka, botu sal gelsinler! 🚀</div>
+    )}
+  </div>
+)}
 
         {tab === 'yorum-yonetimi' && (
            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden text-xs font-bold italic uppercase">

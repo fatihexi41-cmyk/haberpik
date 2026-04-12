@@ -2,18 +2,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, limit, doc } from "firebase/firestore";
 import Link from 'next/link';
 import * as FaIcons from 'react-icons/fa';
-import axios from 'axios';
 
 export default function KategoriSayfasi() {
   const params = useParams();
   const [haberler, setHaberler] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   
-  // KANKA: Spor verileri için yeni state'ler
+  // KANKA: Spor verileri için state'ler
   const [puanDurumu, setPuanDurumu] = useState<any[]>([]);
+  const [fikstur, setFikstur] = useState<any[]>([]); // KANKA: Bunu ekledik
+  const [aktifSekme, setAktifSekme] = useState<'puan' | 'fikstur'>('puan'); // Sekme için
   const [sporYukleniyor, setSporYukleniyor] = useState(false);
 
   const slugRaw = params?.slug ? decodeURIComponent(params.slug as string) : "";
@@ -25,45 +26,54 @@ export default function KategoriSayfasi() {
     if (!slugRaw) return;
     setYukleniyor(true);
 
-    const formatKategoriForFirebase = (text: string) => {
-      return text
-        .replace(/-/g, ' ')
-        .replace(/i/g, 'İ')
-        .replace(/ı/g, 'I')
-        .toUpperCase()
-        .trim();
+    const fetchData = async () => {
+      try {
+        const slugLower = slugRaw.toLowerCase();
+        const q = query(
+          collection(db, "haberler"),
+          orderBy("tarih", "desc"),
+          limit(100)
+        );
+
+        const snapshot = await getDocs(q);
+        const tumHaberler = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const filtrelenmis = tumHaberler.filter((h: any) => {
+          const kategori = (h.kategori || "").toLowerCase();
+          const kategoriSlug = (h.kategori_slug || "").toLowerCase();
+          return kategori.includes(slugLower) || kategoriSlug.includes(slugLower);
+        });
+
+        setHaberler(filtrelenmis);
+      } catch (error) {
+        console.error("Firebase hatası kanka:", error);
+      } finally {
+        setYukleniyor(false);
+      }
     };
 
-    const hedefKategori = formatKategoriForFirebase(slugRaw);
+    fetchData();
 
-    const q = query(
-      collection(db, "haberler"),
-      where("kategori", "==", hedefKategori),
-      orderBy("tarih", "desc")
-    );
+    // SPOR VERİSİ TAKİBİ (Firebase Canlı Bağlantı)
+    let unsubSpor: (() => void) | undefined;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setHaberler(list);
-      setYukleniyor(false);
-    }, (error) => {
-      console.log("Firebase Hatası kanka:", error);
-      setYukleniyor(false);
-    });
-
-    // KANKA: Eğer kategori SPOR ise botu çalıştırıp puan durumunu çekiyoruz
     if (isSpor) {
       setSporYukleniyor(true);
-      // Not: Bu API key geçicidir, dükkan büyüyünce kendi key'ini mühürlersin kanka
-      axios.get('https://api-football-v1.p.rapidapi.com/v3/standings?league=203&season=2025', {
-        headers: { 'X-RapidAPI-Key': '8f27806f155940c6a394f4a36f4f2c0b' } // Örnek key
-      }).then(res => {
-        setPuanDurumu(res.data.response[0].league.standings[0]);
+      // Kanka RapidAPI bitti, artık direkt bizim botun yazdığı 'hizmetler' dökümanına bakıyoruz
+      unsubSpor = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setPuanDurumu(data.lig_durumu || []);
+          // KANKA: Botun getirdiği fikstürü buraya bağlıyoruz
+          setFikstur(data.super_lig_fikstur || data.fikstur || []); 
+        }
         setSporYukleniyor(false);
-      }).catch(() => setSporYukleniyor(false));
+      });
     }
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubSpor) unsubSpor();
+    };
   }, [slugRaw, isSpor]);
 
   if (yukleniyor) return <div className="min-h-screen bg-white flex items-center justify-center font-black italic animate-pulse text-2xl text-red-600 uppercase tracking-tighter">BAĞLANILIYOR...</div>;
@@ -72,12 +82,12 @@ export default function KategoriSayfasi() {
     <main className="max-w-[1150px] mx-auto px-2 py-6 min-h-screen bg-gray-50">
       
       <div className="flex items-center gap-4 mb-8 border-b-4 border-red-600 pb-4">
-         <div className="bg-red-600 text-white p-3 rounded-sm shadow-lg">
-            {isFotoGaleri ? <FaIcons.FaCamera size={24}/> : isVideoGaleri ? <FaIcons.FaPlayCircle size={24}/> : <FaIcons.FaHashtag size={24}/>}
-         </div>
-         <h1 className="text-4xl font-black italic uppercase tracking-tighter text-[#111]">
-            {slugRaw.replace(/-/g, ' ')} <span className="text-gray-400 text-sm font-bold">HABERLERİ</span>
-         </h1>
+          <div className="bg-red-600 text-white p-3 rounded-sm shadow-lg">
+             {isFotoGaleri ? <FaIcons.FaCamera size={24}/> : isVideoGaleri ? <FaIcons.FaPlayCircle size={24}/> : <FaIcons.FaHashtag size={24}/>}
+          </div>
+          <h1 className="text-4xl font-black italic uppercase tracking-tighter text-[#111]">
+             {slugRaw.replace(/-/g, ' ')} <span className="text-gray-400 text-sm font-bold">HABERLERİ</span>
+          </h1>
       </div>
 
       <div className={`grid grid-cols-1 ${isSpor ? 'lg:grid-cols-12' : 'md:grid-cols-1'} gap-8`}>
@@ -116,7 +126,7 @@ export default function KategoriSayfasi() {
                     </h3>
                     <div className="mt-4 pt-3 border-t border-gray-50 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase italic">
                       <span><FaIcons.FaCalendarAlt className="inline mr-1"/> {h.tarih?.seconds ? new Date(h.tarih.seconds * 1000).toLocaleDateString('tr-TR') : 'YENİ'}</span>
-                      <span className="text-red-600 font-black uppercase">{isVideoGaleri ? "İZLE →" : "İNCELE →"}</span>
+                      <span className="text-red-600 font-black uppercase">{h.kategori === "VİDEO GALERİ" ? "İZLE →" : "İNCELE →"}</span>
                     </div>
                   </div>
                 </Link>
@@ -124,70 +134,77 @@ export default function KategoriSayfasi() {
             </div>
           ) : (
             <div className="py-20 text-center">
-               <FaIcons.FaRegFolderOpen size={64} className="mx-auto text-gray-200 mb-4"/>
-               <p className="text-gray-400 font-black italic uppercase">İçerik bulunamadı kanka.</p>
+                <FaIcons.FaRegFolderOpen size={64} className="mx-auto text-gray-200 mb-4"/>
+                <p className="text-gray-400 font-black italic uppercase">İçerik bulunamadı kanka.</p>
             </div>
           )}
         </div>
 
         {/* SAĞ TARAF: SPOR BÖLÜMÜNE ÖZEL PUAN DURUMU & FİKSTÜR */}
         {isSpor && (
-          <div className="lg:col-span-4 space-y-6 animate-in slide-in-from-right duration-500">
+          <div className="lg:col-span-4 space-y-6">
             
-            {/* SÜPER LİG TABLOSU */}
             <div className="bg-white border-t-4 border-red-600 shadow-xl overflow-hidden rounded-sm">
-              <div className="bg-[#111] text-white p-4 flex justify-between items-center">
-                <span className="text-[10px] font-black italic italic uppercase tracking-widest">SÜPER LİG PUAN DURUMU</span>
-                <FaIcons.FaTrophy className="text-yellow-500"/>
+              {/* SEKMELER */}
+              <div className="flex bg-[#111] border-b border-white/10">
+                <button 
+                  onClick={() => setAktifSekme('puan')}
+                  className={`flex-1 py-3 text-[10px] font-black italic transition-all ${aktifSekme === 'puan' ? 'text-white bg-red-600' : 'text-gray-500 hover:text-white'}`}>
+                  PUAN DURUMU
+                </button>
+                <button 
+                  onClick={() => setAktifSekme('fikstur')}
+                  className={`flex-1 py-3 text-[10px] font-black italic transition-all ${aktifSekme === 'fikstur' ? 'text-white bg-red-600' : 'text-gray-500 hover:text-white'}`}>
+                  FİKSTÜR
+                </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[10px] text-left uppercase font-black italic">
-                  <thead className="bg-gray-100 border-b">
-                    <tr>
-                      <th className="p-3">S</th>
-                      <th className="p-3">TAKIM</th>
-                      <th className="p-3">O</th>
-                      <th className="p-3 text-red-600">P</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {puanDurumu.length > 0 ? puanDurumu.slice(0, 20).map((takim, index) => (
-                      <tr key={index} className={`border-b hover:bg-gray-50 transition-colors ${takim.team.name.includes('Kocaeli') ? 'bg-green-100 border-green-600' : ''}`}>
-                        <td className="p-3 font-bold">{index + 1}</td>
-                        <td className="p-3 flex items-center gap-2">
-                          <img src={takim.team.logo} className="w-4 h-4 object-contain" alt="logo" />
-                          <span className={takim.team.name.includes('Kocaeli') ? 'text-green-800' : ''}>{takim.team.name.replace('SK', '').trim()}</span>
-                        </td>
-                        <td className="p-3">{takim.all.played}</td>
-                        <td className="p-3 font-black text-red-600">{takim.points}</td>
+
+              <div className="max-h-[600px] overflow-y-auto no-scrollbar">
+                {aktifSekme === 'puan' ? (
+                  <table className="w-full text-[10px] text-left uppercase font-black italic">
+                    <thead className="bg-gray-100 text-gray-500 border-b">
+                      <tr>
+                        <th className="p-2 text-center">#</th>
+                        <th className="p-2">TAKIM</th>
+                        <th className="p-2 text-center">O</th>
+                        <th className="p-2 text-center text-red-600">P</th>
                       </tr>
+                    </thead>
+                    <tbody>
+                      {puanDurumu.length > 0 ? puanDurumu.map((takim: any, index: number) => (
+                        <tr key={index} className={`border-b border-gray-100 hover:bg-gray-50 ${takim.team.name.includes('Kocaeli') ? 'bg-green-50' : ''}`}>
+                          <td className="p-2 text-center text-gray-400">{index + 1}</td>
+                          <td className="p-2 flex items-center gap-2">
+                            <span className={`truncate max-w-[120px] ${takim.team.name.includes('Kocaeli') ? 'text-green-700 font-extrabold' : 'text-gray-800'}`}>
+                              {takim.team.name.replace('A.Ş.', '').trim()}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">{takim.played}</td>
+                          <td className="p-2 text-center font-black text-red-600 bg-red-50">{takim.points}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={4} className="p-10 text-center animate-pulse text-gray-400 font-black italic">VERİLER MÜHÜRLENİYOR...</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="divide-y divide-gray-100 bg-white">
+                    {fikstur.length > 0 ? fikstur.map((mac: any, index: number) => (
+                      <div key={index} className="p-3 hover:bg-gray-50 transition-all border-l-4 border-transparent hover:border-red-600">
+                        <p className="text-[8px] text-gray-400 font-black italic mb-1 uppercase">{mac.time || "SÜPER LİG"}</p>
+                        <div className="flex justify-between items-center text-[10px] font-black italic text-gray-800 tracking-tighter">
+                          <span className={mac.home.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.home}</span>
+                          <span className="text-red-600 px-2">VS</span>
+                          <span className={mac.away.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.away}</span>
+                        </div>
+                      </div>
                     )) : (
-                      <tr><td colSpan={4} className="p-10 text-center animate-pulse">VERİLER MÜHÜRLENİYOR...</td></tr>
+                      <div className="p-10 text-center text-gray-400 font-black italic uppercase">FİKSTÜR BEKLENİYOR...</div>
                     )}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* KOCAELİSPOR ÖZEL FİKSTÜR */}
-            <div className="bg-[#1a1a1a] text-white p-5 rounded-sm border-l-8 border-green-600 shadow-2xl">
-               <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-[11px] font-black italic uppercase tracking-tighter">KOCAELİSPOR FİKSTÜR</h4>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
-               </div>
-               <div className="space-y-4">
-                  <div className="bg-white/5 p-3 rounded border border-white/5">
-                     <p className="text-[8px] text-gray-500 mb-2 uppercase font-black">Sıradaki Randevu</p>
-                     <div className="flex justify-between items-center text-[10px] font-black italic">
-                        <span className="text-green-500">KOCAELİSPOR</span>
-                        <span className="bg-red-600 px-2 py-0.5 rounded text-[8px] italic">VS</span>
-                        <span className="text-gray-300">FENERBAHÇE</span>
-                     </div>
-                     <p className="text-[8px] text-center mt-3 text-gray-400">🏟️ YILDIZ ENTEGRE STADYUMU</p>
-                  </div>
-               </div>
-            </div>
-
           </div>
         )}
 

@@ -164,6 +164,20 @@ export default function HaberDetayClient({ id }: { id: string }) {
           className="haber-metni prose prose-red max-w-none text-[#222] leading-relaxed text-lg md:text-xl font-medium mb-12 bg-white p-6 md:p-10 shadow-sm border border-gray-100 italic"
           dangerouslySetInnerHTML={{ __html: haber.icerik || "İçerik yüklenemedi." }}
         />
+        {/* KANKA: HABER İÇİ EKSTRA RESİMLER BURADA BAŞLIYOR */}
+{haber.icerikResimleri && haber.icerikResimleri.length > 0 && (
+  <div className="my-8 space-y-6">
+    {haber.icerikResimleri.map((resimUrl, index) => (
+      <div key={index} className="w-full overflow-hidden rounded-2xl shadow-md">
+        <img 
+          src={resimUrl} 
+          alt={`${haber.baslik} - Görsel ${index + 1}`} 
+          className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+        />
+      </div>
+    ))}
+  </div>
+)}
 
         {/* KANKA: EMOJI TEPKİ BARI BURADA MÜHÜRLENDİ */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xl mb-10 flex flex-col items-center">
@@ -188,6 +202,7 @@ export default function HaberDetayClient({ id }: { id: string }) {
                 ))}
             </div>
         </div>
+        
 
         {/* KANKA: YAZAR KARTINI BURAYA DİKTİK */}
         <div className="bg-[#111] text-white p-6 rounded-2xl flex items-center gap-6 mb-20 shadow-2xl relative overflow-hidden group">

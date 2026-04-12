@@ -72,10 +72,10 @@ const unsubServices = onSnapshot(doc(db, "ayarlar", "hizmetler"), (doc) => {
   }
 });
 
-    return () => {
-      unsubSettings();
-      unsubServices();
-    };
+return () => {
+  if (typeof unsubSettings === 'function') unsubSettings();
+  if (typeof unsubServices === 'function') unsubServices();
+};
   }, []);
 
   const toggleDarkMode = () => {
@@ -195,9 +195,27 @@ const unsubServices = onSnapshot(doc(db, "ayarlar", "hizmetler"), (doc) => {
           <div className="max-w-[1150px] mx-auto flex items-center justify-between text-[12px] uppercase tracking-tighter text-white">
             <div className="flex items-center overflow-x-auto no-scrollbar">
               <Link href="/" className="px-3 py-3 bg-red-600 text-white"><FaIcons.FaHome size={18}/></Link>
-              {["GÜNDEM", "SİYASET", "SPOR", "EKONOMİ", "ASAYİŞ", "DÜNYA", "TÜRKİYE HABERLERİ", "BİLİM TEKNOLOJİ"].map(m => (
-                <Link key={m} href={`/kategori/${m.toLowerCase().replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ /g, '-')}`} className="px-3 py-3 hover:bg-white/10 border-r border-white/5 whitespace-nowrap">{m}</Link>
-              ))}
+              {["GÜNDEM", "SİYASET", "SPOR", "EKONOMİ", "ASAYİŞ", "DÜNYA", "TÜRKİYE HABERLERİ", "BİLİM TEKNOLOJİ"].map(m => {
+  // KANKA: Slug oluştururken karmaşık replace yerine sade bir mantık kuruyoruz
+  const safeSlug = m.toLowerCase()
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/ /g, '-');
+
+  return (
+    <Link 
+      key={m} 
+      href={`/kategori/${safeSlug}`} 
+      className="px-3 py-3 hover:bg-white/10 border-r border-white/5 whitespace-nowrap"
+    >
+      {m}
+    </Link>
+  );
+})}
             </div>
             
             <div className="flex items-center">

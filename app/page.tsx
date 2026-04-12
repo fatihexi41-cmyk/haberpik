@@ -34,26 +34,20 @@ export default function Home() {
   const [gazeteModalAcik, setGazeteModalAcik] = useState(false); 
   const [seciliGazete, setSeciliGazete] = useState<any>(null);
 
-useEffect(() => {
     // 1. MANŞET HABERLER SORGUSU
-    const qHaber = query(
-      collection(db, "haberler"), 
-      where("manset", "==", true), 
-      orderBy("tarih", "desc"), 
-      limit(15)
-    );
+useEffect(() => {
+const qHaber = query(
+  collection(db, "haberler"), 
+  orderBy("tarih", "desc"), 
+  limit(50) 
+);
 
-    // KANKA: Bu kısmı unutmuşuz, haberleri Firebase'den çeken asıl motor bu:
     const unsubscribeHaber = onSnapshot(qHaber, (snapshot) => {
-      setHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const veriler = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log("Dükkana toplam haber indi kanka:", veriler.length);
+      setHaberler(veriler);
       setYukleniyor(false);
-    });
-
-    // 2. GAZETE MANŞETLERİ SORGUSU
-    const qGazete = query(collection(db, "mansetler"), orderBy("tarih", "desc"), limit(30));
-    const unsubscribeGazete = onSnapshot(qGazete, (snapshot) => {
-      setGazeteler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    })
 
     // 3. DİKEY VİDEOLAR SORGUSU
     const qDikey = query(collection(db, "dikey_videolar"), orderBy("tarih", "desc"), limit(20));
@@ -66,21 +60,33 @@ useEffect(() => {
       if (docSnap.exists()) setSiteAyarlari(docSnap.data());
     });
 
-    // 5. HİZMETLER (HAVA, FİKSTÜR, ETKİNLİK)
-    const unsubHizmetler = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.lig_durumu) setPuanDurumu(data.lig_durumu);
-        if (data.kocaeli_fikstur) setFikstur(data.kocaeli_fikstur);
-        if (data.filmler) setFilmler(data.filmler);
-        if (data.etkinlikler) setEtkinlikler(data.etkinlikler);
-      }
-    });
+// --- 5. HİZMETLER (FUTBOL, GAZETE, HAVA, ETKİNLİK) ---
+const unsubHizmetler = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    console.log("🚀 Hizmetler Verisi Geldi, Masaya Diziliyor...");
 
+    // KANKA: Bak hepsi bu parantezin içinde, artık hata veremez!
+    if (data.gazeteMansetleri) setGazeteler(data.gazeteMansetleri);
+    if (data.lig_durumu) setPuanDurumu(data.lig_durumu);
+    if (data.super_lig_fikstur) setFikstur(data.super_lig_fikstur);
+    if (data.filmler) setFilmler(data.filmler);
+    if (data.etkinlikler) setEtkinlikler(data.etkinlikler);
+    
+    // Hava durumu için kontrol
+    if (data.hava && typeof (window as any).setHavaDurumu === 'function') {
+      (window as any).setHavaDurumu(data.hava);
+    }
+  } else {
+    console.log("⚠️ Hizmet dökümanı boş kanka!");
+  }
+});
+
+// KANKA ÇOK KRİTİK: Home sayfasındaki şu eski dinleyiciyi SİL:
+// const qGazete = query(collection(db, "mansetler")...); // BU SATIRI VE ALTINDAKİ UNSUBSCRIBE'I SİL!
     // TEMİZLİK: Sayfadan çıkınca tüm dinleyicileri kapatıyoruz
     return () => {
       unsubscribeHaber();
-      unsubscribeGazete();
       unsubscribeDikey();
       unsubHizmetler();
     };
@@ -233,41 +239,66 @@ useEffect(() => {
                    </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto no-scrollbar">
+                <div className="flex-1 overflow-y-auto no-scrollbar bg-white">
                     {aktifSekme === 'puan' ? (
-                        <table className="w-full text-[10px] font-black italic uppercase text-left">
-                            <thead className="bg-[#111] text-white sticky top-0 z-10">
-                                <tr><th className="p-3">S</th><th className="p-3">TAKIM</th><th className="p-3 text-center">G</th><th className="p-3 text-center bg-green-900">P</th></tr>
+                        <table className="w-full text-[10px] font-black italic uppercase text-left border-collapse">
+                            <thead className="bg-[#111] text-gray-400 sticky top-0 z-10">
+                                <tr>
+                                    <th className="p-3 text-center w-10 border-r border-white/10">#</th>
+                                    <th className="p-3">TAKIM ADI</th>
+                                    <th className="p-3 text-center w-10">O</th>
+                                    <th className="p-3 text-center w-10 text-green-500 font-black">G</th>
+                                    <th className="p-3 text-center w-10">B</th>
+                                    <th className="p-3 text-center w-10 text-red-500">M</th>
+                                    <th className="p-3 text-center w-12 bg-red-600 text-white font-black">P</th>
+                                </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {puanDurumu.length > 0 ? puanDurumu.map((takim, index) => (
-                                    <tr key={index} className={`hover:bg-green-50 ${takim.team.name.includes('Kocaeli') ? 'bg-green-100 border-l-4 border-green-600' : ''}`}>
-                                        <td className="p-2 font-bold">{index + 1}</td>
-                                        <td className="p-2 flex items-center gap-2">
-                                            <img src={takim.team.logo} className="w-4 h-4 object-contain" alt="logo" />
-                                            <span className="truncate max-w-[80px]">{takim.team.name}</span>
-                                        </td>
-                                        <td className="p-2 text-center">{takim.all.win}</td>
-                                        <td className="p-2 text-center font-black bg-gray-100">{takim.points}</td>
+                            <tbody className="divide-y divide-gray-200">
+                                {puanDurumu && puanDurumu.length > 0 ? (
+                                    puanDurumu.map((takim, index) => (
+                                        <tr key={index} className={`hover:bg-gray-50 transition-colors ${takim.team.name.includes('Kocaeli') ? 'bg-green-100/50' : ''}`}>
+                                            <td className="p-3 text-center font-bold text-gray-400 border-r bg-gray-50/50">{index + 1}</td>
+                                            <td className="p-3">
+                                                <div className="flex flex-col">
+                                                    <span className={`font-black tracking-tighter text-[12px] ${takim.team.name.includes('Kocaeli') ? 'text-green-700' : 'text-gray-900'}`}>
+                                                        {takim.team.name.replace('A.Ş.', '').replace('SK', '').trim()}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="p-3 text-center text-gray-600 font-bold">{takim.played}</td>
+                                            <td className="p-3 text-center text-green-600 font-black">{takim.won}</td>
+                                            <td className="p-3 text-center text-orange-600 font-bold">{takim.draw}</td>
+                                            <td className="p-3 text-center text-red-500 font-bold">{takim.lost}</td>
+                                            <td className="p-3 text-center font-black bg-red-50 text-red-600 border-l border-red-100">{takim.points}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={7} className="p-20 text-center animate-pulse text-gray-400 italic font-black uppercase tracking-tighter">PUAN DURUMU GÜNCELLENİYOR...</td>
                                     </tr>
-                                )) : <tr><td colSpan={4} className="p-20 text-center animate-pulse">VERİ BEKLENİYOR...</td></tr>}
+                                )}
                             </tbody>
                         </table>
                     ) : (
+                        /* FİKSTÜR BÖLÜMÜ - BURASI DA SADE VE ŞIK */
                         <div className="divide-y divide-gray-100">
-                            {fikstur.length > 0 ? fikstur.map((mac, index) => (
-                                <div key={index} className="p-3 flex items-center justify-between bg-white hover:bg-gray-50 transition-all border-l-4 border-green-600">
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <span className="text-[9px] text-gray-500 font-bold uppercase">{new Date(mac.fixture.date).toLocaleDateString('tr-TR')}</span>
-                                        <div className="flex items-center gap-2 font-black italic text-[11px] uppercase tracking-tighter">
-                                            <span className={mac.teams.home.id === 611 ? 'text-green-600' : ''}>{mac.teams.home.name}</span>
-                                            <span className="text-gray-400">VS</span>
-                                            <span className={mac.teams.away.id === 611 ? 'text-green-600' : ''}>{mac.teams.away.name}</span>
+                            {fikstur && fikstur.length > 0 ? (
+                                fikstur.map((mac, index) => (
+                                    <div key={index} className="p-4 flex items-center justify-between bg-white hover:bg-gray-50 transition-all border-l-4 border-green-600">
+                                        <div className="flex flex-col gap-1 text-left">
+                                            <span className="text-[10px] text-gray-400 font-black uppercase italic tracking-widest">{mac.time}</span>
+                                            <div className="flex items-center gap-3 font-black italic text-[13px] uppercase tracking-tighter text-gray-900">
+                                                <span className={mac.home.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.home}</span>
+                                                <span className="text-red-600 text-[10px] px-2 bg-gray-100 rounded-full">VS</span>
+                                                <span className={mac.away.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.away}</span>
+                                            </div>
                                         </div>
+                                        <div className="bg-black text-white px-3 py-1 rounded-sm text-[10px] font-black italic uppercase tracking-tighter">FİKSTÜR</div>
                                     </div>
-                                    <img src={mac.teams.home.id === 611 ? mac.teams.away.logo : mac.teams.home.logo} className="w-8 h-8 object-contain opacity-30" alt="rival" />
-                                </div>
-                            )) : <div className="p-20 text-center font-black italic text-gray-400">FİKSTÜR YÜKLENİYOR...</div>}
+                                ))
+                            ) : (
+                                <div className="p-20 text-center font-black italic text-gray-400 uppercase tracking-tighter">MAÇ TAKVİMİ BEKLENİYOR...</div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -308,22 +339,86 @@ useEffect(() => {
           </div>
       </section>
 
-      {/* 6. GAZETELER */}
-      <section className="bg-[#0a0a0a] p-4 shadow-2xl">
-          <div className="flex items-center gap-4 mb-4">
-              <h3 className="text-lg font-black italic uppercase text-white tracking-widest">GAZETE MANŞETLERİ</h3>
-              <div className="h-[1px] bg-red-600 flex-1"></div>
+      {/* 6. GAZETELER - KANKA: PREMİUM GÖRÜNÜM */}
+      <section className="bg-[#0a0a0a] py-8 px-4 shadow-2xl relative overflow-hidden">
+          {/* Arka plana hafif bir efekt */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent"></div>
+          
+          <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-red-600 p-2 rounded-sm text-white shadow-lg shadow-red-600/20">
+                  <FaIcons.FaNewspaper size={20} />
+                </div>
+                <h3 className="text-xl font-black italic uppercase text-white tracking-widest">GÜNÜN MANŞETLERİ</h3>
+              </div>
+              <span className="text-[10px] text-gray-500 font-bold italic uppercase tracking-tighter hidden md:block">
+                Son Güncelleme: {new Date().toLocaleDateString('tr-TR')}
+              </span>
           </div>
-          <Swiper modules={[Autoplay, Navigation]} slidesPerView={3} breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 7 } }} spaceBetween={5} autoplay={{ delay: 3500 }} navigation className="h-64">
-            {gazeteler.map((g) => (
-              <SwiperSlide key={g.id}>
-                  <div onClick={() => { setSeciliGazete(g); setGazeteModalAcik(true); }} className="bg-white h-full group cursor-pointer relative overflow-hidden">
-                     <img src={g.resim} loading="lazy" className="w-full h-full object-cover" alt={g.ad} />
-                     <div className="absolute bottom-0 left-0 w-full bg-red-600 text-white text-center text-[9px] font-black italic py-1">{g.ad}</div>
-                  </div>
-              </SwiperSlide>
-            ))}
+
+          <Swiper 
+            modules={[Autoplay, Navigation]} 
+            slidesPerView={2.5} 
+            breakpoints={{ 768: { slidesPerView: 5 }, 1024: { slidesPerView: 7 } }} 
+            spaceBetween={12} 
+            autoplay={{ delay: 3500 }} 
+            navigation 
+            className="h-72 gazete-swiper"
+          >
+            {/* KANKA: Gazeteler Bölümü - SwiperSlide İçeriği */}
+{gazeteler && gazeteler.length > 0 ? gazeteler.map((g, index) => (
+  <SwiperSlide key={index}>
+      <div 
+        onClick={() => { setSeciliGazete(g); setGazeteModalAcik(true); }} 
+        className="bg-white h-full group cursor-pointer relative overflow-hidden rounded-sm border-2 border-transparent hover:border-red-600 transition-all duration-300 shadow-lg"
+      >
+          {/* KANKA DİKKAT: Bot 'img' olarak gönderiyor, burayı 'g.img' yapıyoruz */}
+          <img 
+            src={g.img} 
+            loading="lazy" 
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+            alt={g.ad} 
+            // Resim yüklenmezse diye bir yedek ikon veya boşluk koyalım
+            onError={(e) => { (e.target as any).src = 'https://via.placeholder.com/400x600?text=Gazete+Yuklenemedi' }}
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-black/80 backdrop-blur-sm text-white text-center text-[9px] font-black italic py-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {g.ad}
+          </div>
+      </div>
+  </SwiperSlide>
+)) : (
+    /* Yükleniyor skeletonu kanka */
+    [1,2,3,4,5,6,7].map((i) => (
+        <SwiperSlide key={i}>
+            <div className="bg-gray-800 animate-pulse h-full rounded-sm"></div>
+        </SwiperSlide>
+    ))
+)}
           </Swiper>
+
+          {/* GAZETE MODAL - KANKA: TIKLAYINCA DEV GİBİ AÇILAN YER */}
+          {gazeteModalAcik && seciliGazete && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-4 md:p-10 backdrop-blur-xl animate-in fade-in duration-300">
+                <button 
+                  onClick={() => setGazeteModalAcik(false)}
+                  className="absolute top-6 right-6 text-white hover:text-red-600 transition-colors z-50 bg-white/10 p-3 rounded-full"
+                >
+                  <FaIcons.FaTimes size={32} />
+                </button>
+                
+                <div className="relative w-full max-w-4xl h-full flex flex-col items-center justify-center">
+                    <img 
+  src={seciliGazete.img} // Burada da 'img' olduğundan emin ol kanka
+  className="max-h-[85vh] w-auto shadow-[0_0_50px_rgba(255,255,255,0.1)] rounded-sm animate-in zoom-in-95 duration-300" 
+  alt={seciliGazete.ad} 
+/>
+                    <div className="mt-6 text-center">
+                        <h2 className="text-white text-3xl font-black italic uppercase tracking-tighter">{seciliGazete.ad}</h2>
+                        <p className="text-gray-400 text-sm font-bold mt-1 uppercase italic tracking-widest">{new Date().toLocaleDateString('tr-TR')} Manşeti</p>
+                    </div>
+                </div>
+            </div>
+          )}
       </section>
 
       {/* 7. EKONOMİPİK - KANKA: BURASI GERİ GELDİ */}
@@ -429,33 +524,69 @@ useEffect(() => {
         </div>
       </section>
 
-      {/* 6. ETKİNLİK TAKVİMİ - KOCAELİ AJANDASI */}
-      <section className="bg-white py-12 border-t border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-3 mb-8">
-             <div className="bg-green-600 p-2 text-white"><FaIcons.FaCalendarAlt size={24} /></div>
-             <h2 className="text-3xl font-black italic uppercase text-gray-900 tracking-tighter">KOCAELİ <span className="text-green-600">ETKİNLİK TAKVİMİ</span></h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {etkinlikler.length > 0 ? etkinlikler.map((etkinlik, i) => (
-              <div key={i} className="flex gap-4 p-4 bg-gray-50 border-l-4 border-green-600 hover:bg-white hover:shadow-xl transition-all group cursor-pointer">
-                <div className="flex flex-col items-center justify-center bg-white border border-gray-100 px-4 py-2 rounded min-w-[70px] h-20 shadow-sm">
-                  <span className="text-green-600 font-black text-2xl leading-none">{etkinlik.gun || '00'}</span>
-                  <span className="text-gray-400 font-bold text-[10px] uppercase">{etkinlik.ay || 'AY'}</span>
-                </div>
-                <div className="flex flex-col justify-center text-left">
-                  <h3 className="font-black italic text-md text-gray-800 uppercase leading-tight mb-1 group-hover:text-green-600 transition-all">{etkinlik.baslik}</h3>
-                  <div className="flex flex-wrap gap-3 text-[10px] font-bold text-gray-500 uppercase">
-                    <span className="flex items-center gap-1"><FaIcons.FaMapMarkerAlt className="text-red-500" /> {etkinlik.mekan}</span>
-                    <span className="flex items-center gap-1"><FaIcons.FaClock className="text-blue-500" /> {etkinlik.saat}</span>
-                  </div>
-                </div>
-              </div>
-            )) : <div className="col-span-full text-center text-gray-400 italic py-10 uppercase font-black">ŞEHİRDEKİ ETKİNLİKLER MÜHÜRLENİYOR...</div>}
-          </div>
+      {/* 6. ETKİNLİK TAKVİMİ - KOCAELİ AJANDASI (MÜHÜRLÜ VERSİYON) */}
+<section className="bg-white py-12 border-t border-gray-200">
+  <div className="container mx-auto px-4">
+    <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center gap-3">
+        <div className="bg-green-600 p-2 text-white shadow-lg">
+          <FaIcons.FaCalendarAlt size={24} />
         </div>
-      </section>
+        <h2 className="text-3xl font-black italic uppercase text-gray-900 tracking-tighter">
+          KOCAELİ <span className="text-green-600">ETKİNLİK TAKVİMİ</span>
+        </h2>
+      </div>
+      <span className="text-[10px] bg-gray-100 px-3 py-1 rounded-full font-black italic text-gray-500 uppercase tracking-widest">
+        Canlı Ajanda
+      </span>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {etkinlikler && etkinlikler.length > 0 ? (
+        etkinlikler.map((etkinlik, i) => (
+          <div 
+            key={i} 
+            className="flex gap-4 p-4 bg-gray-50 border-l-4 border-green-600 hover:bg-white hover:shadow-2xl transition-all group cursor-pointer"
+          >
+            {/* SOL: TARİH KUTUCUĞU - BOTUN GÖNDERDİĞİ GÜN/AY BURAYA GELİYOR */}
+            <div className="flex flex-col items-center justify-center bg-white border border-gray-100 px-4 py-2 rounded min-w-[80px] h-20 shadow-sm group-hover:border-green-600 transition-colors">
+              <span className="text-green-600 font-black text-2xl leading-none">
+                {etkinlik.gun || '15'}
+              </span>
+              <span className="text-gray-400 font-bold text-[10px] uppercase tracking-tighter">
+                {etkinlik.ay || 'NİSAN'}
+              </span>
+            </div>
+
+            {/* SAĞ: ETKİNLİK DETAYLARI */}
+            <div className="flex flex-col justify-center text-left overflow-hidden">
+              <h3 className="font-black italic text-md text-gray-800 uppercase leading-tight mb-1 group-hover:text-green-600 transition-all truncate">
+                {etkinlik.baslik || 'Kocaeli Kültür Etkinliği'}
+              </h3>
+              <div className="flex flex-wrap gap-3 text-[10px] font-bold text-gray-500 uppercase">
+                <span className="flex items-center gap-1">
+                  <FaIcons.FaMapMarkerAlt className="text-red-500" /> 
+                  {etkinlik.mekan || 'Kocaeli'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <FaIcons.FaClock className="text-blue-500" /> 
+                  {etkinlik.saat || '20:00'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))
+      ) : (
+        /* YÜKLENİYOR / VERİ YOK DURUMU */
+        <div className="col-span-full text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+           <p className="text-gray-400 italic font-black uppercase tracking-tighter animate-pulse">
+             Şehirdeki Etkinlikler Mühürleniyor, Bekle Kanka... ⏳
+           </p>
+        </div>
+      )}
+    </div>
+  </div>
+</section>
 
 {/* KANKA: TÜM ÖZEL STİLLER BURADA BİRLEŞTİ */}
       <style jsx global>{`
