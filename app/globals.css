@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #171717;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #0a0a0a;
+      --foreground: #ededed;
+    }
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* HABERPİK KESİN ÇÖZÜM: BURAYI HİÇ BOZMUYORUZ ÇÜNKÜ ÇALIŞTI! */
+.premium-slider .swiper-pagination {
+  bottom: 30px !important;
+  left: 20px !important;
+  display: flex !important;
+  gap: 10px !important;
+  z-index: 9999 !important;
+  width: auto !important;
+}
+
+.custom-bullet {
+  width: 28px !important;
+  height: 28px !important;
+  background-color: #ffffff !important; 
+  color: #000000 !important;          
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  opacity: 1 !important;
+  border: 1px solid rgba(0,0,0,0.2) !important;
+  cursor: pointer !important;
+}
+
+.swiper-pagination-bullet-active.custom-bullet {
+  background-color: #dc2626 !important; 
+  color: #ffffff !important;
+}
+.dark body {
+  background-color: #111 !important;
+}
+.dark .bg-white {
+  background-color: #1a1a1a !important;
+  color: #fff !important;
+}
+.dark .bg-gray-200 {
+  background-color: #111 !important;
 }

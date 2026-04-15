@@ -27,11 +27,13 @@ export default function AdminPremiumV2() {
   const [filmler, setFilmler] = useState([]);
   const [etkinlikler, setEtkinlikler] = useState([]);
   const [kurlar, setKurlar] = useState(null);
+  const [solReklam, setSolReklam] = useState("");
+  const [sagReklam, setSagReklam] = useState("");
 // siteAyarlari state'inin içine şunları da ekle:
 // facebook: '', twitter: '', instagram: '', youtube: '', kunyeMetni: '', yayinIlkeleri: '', gizlilikSozlesmesi: ''
 
   // KANKA: İstediğin Onay TV tarzı detaylı ayar yapısı burası
-  const [siteAyarlari, setSiteAyarlari] = useState({
+  const [siteAyarlari, setSiteAyarlari] = useState<any>({
     siteBasligi: 'Haberpik - Güvenilir Bilgi',
     siteKisaBasligi: 'Haberpik',
     siteAciklaması: '',
@@ -44,6 +46,8 @@ export default function AdminPremiumV2() {
     whatsapp: '',
     reklam1: '',
     reklam2: '',
+    solReklam: '', // KANKA: Sol dikine reklam buraya
+    sagReklam: '', // KANKA: Sağ dikine reklam buraya
     facebook: '',
     twitter: '',
     instagram: '',
@@ -53,12 +57,13 @@ export default function AdminPremiumV2() {
     gizlilikSozlesmesi: ''
   });
 
-  const [formData, setFormData] = useState({
-  baslik: '', ozet: '', icerik: '', resim: '', kategori: 'GÜNDEM',
-  mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false,
-  anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif',
-  icerikResimleri: [] as string[] // KANKA: İşte burası çoklu resim dizisi!
-});
+  const [formData, setFormData] = useState<any>({
+    baslik: '', ozet: '', icerik: '', resim: '', 
+    kategoriler: ['GÜNDEM'], // Kanka burayı 'any' yaparak TS'yi susturduk
+    mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false,
+    anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif',
+    icerikResimleri: []
+  });
 
 const [ekstraResimUrl, setEkstraResimUrl] = useState(''); // Input için geçici kutu
 
@@ -129,8 +134,8 @@ const haberKaydet = async (e: React.FormEvent) => {
     // KANKA KONUM: Burası çok kritik. Ana sayfanın tanıdığı isimleri buraya mühürlüyoruz.
     const mühürlüVeri = { 
       ...formData, 
-      kategori_slug: slugOlustur(formData.kategori),
-      // ANA SAYFA FİLTRELERİ İÇİN EK MÜHÜRLER:
+      kategori_slug: slugOlustur(formData.kategoriler?.[0] || 'gundem'),
+      kategori: formData.kategoriler?.[0] || 'GÜNDEM',
       manset: formData.mansetEkle || false, 
       slider: formData.sliderEkle || false,
       guncellemeTarihi: new Date() 
@@ -203,6 +208,9 @@ const haberKaydet = async (e: React.FormEvent) => {
           <button onClick={() => setTab('gazete-mansetleri')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'gazete-mansetleri' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaNewspaper/> Gazeteler</button>
           <button onClick={() => setTab('mesajlar')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'mesajlar' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaInbox/> Gelen Kutusu</button>
           <button onClick={() => setTab('site-ayarlari')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'site-ayarlari' ? 'bg-red-600' : 'text-gray-400 hover:bg-white/5'}`}><FaIcons.FaTools/> Ayarlar</button>
+          <button onClick={() => setTab('lig-merkezi')} className={`w-full flex items-center gap-4 p-4 rounded-xl ${tab === 'lig-merkezi' ? 'bg-green-600' : 'text-gray-400 hover:bg-white/5'}`}>
+  <FaIcons.FaFutbol/> Lig Merkezi
+</button>
         </nav>
         <div className="p-6 border-t border-white/5"><button onClick={() => signOut(auth)} className="w-full text-red-500 font-black italic uppercase text-[10px] flex items-center justify-center gap-2"><FaIcons.FaSignOutAlt/> Çıkış</button></div>
       </aside>
@@ -219,18 +227,23 @@ const haberKaydet = async (e: React.FormEvent) => {
 
         {tab === 'haber-ekle' && (
           <form onSubmit={haberKaydet} className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
+            {/* SOL KOLON: BAŞLIK, ÖZET, İÇERİK */}
             <div className="lg:col-span-8 space-y-6">
               <div className="bg-white p-8 rounded-2xl border shadow-sm space-y-4">
                 <input required className="w-full p-4 bg-gray-50 border-none rounded-xl font-bold italic outline-red-600 text-lg uppercase" placeholder="Başlık" value={formData.baslik} onChange={(e)=>setFormData({...formData, baslik: e.target.value})} />
                 <textarea required className="w-full p-4 bg-gray-50 border-none rounded-xl italic h-24 text-sm font-bold" placeholder="Spot (Özet)" value={formData.ozet} onChange={(e)=>setFormData({...formData, ozet: e.target.value})} />
                 <textarea required className="w-full p-6 bg-gray-50 border-none rounded-2xl italic min-h-[500px] text-lg font-medium" placeholder="İçerik..." value={formData.icerik} onChange={(e)=>setFormData({...formData, icerik: e.target.value})} />
               </div>
+
+              {/* SEO AYARLARI */}
               <div className="bg-white p-8 rounded-2xl border shadow-sm space-y-4 font-black italic uppercase">
                 <h4 className="text-xs border-b pb-2 flex items-center gap-2 text-blue-600"><FaIcons.FaSearch/> Google SEO</h4>
                 <input className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px]" placeholder="ANAHTAR KELİMELER" value={formData.anahtarKelimeler} onChange={(e)=>setFormData({...formData, anahtarKelimeler: e.target.value})} />
                 <textarea className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px] h-20" placeholder="META AÇIKLAMA" value={formData.metaAciklama} onChange={(e)=>setFormData({...formData, metaAciklama: e.target.value})} />
               </div>
             </div>
+
+            {/* SAĞ KOLON: AYARLAR VE KATEGORİLER */}
             <div className="lg:col-span-4 space-y-6 font-black italic uppercase">
               <div className="bg-white p-8 rounded-2xl border shadow-sm space-y-6">
                 <h4 className="border-b pb-4 text-xs">Ayarlar</h4>
@@ -241,62 +254,61 @@ const haberKaydet = async (e: React.FormEvent) => {
                     </div>
                   ))}
                 </div>
-                {/* KANKA: İçerik Resimleri Ekleme Kutusu */}
-{/* KANKA: İÇERİK RESİMLERİ EKLEME KUTUSU BAŞLANGIÇ */}
-<div className="bg-gray-50 p-4 rounded-xl space-y-2 mt-4 border border-dashed border-gray-300">
-  <label className="text-[10px] font-black italic uppercase text-gray-500">HABER İÇİ RESİMLER (URL)</label>
-  <div className="flex gap-2">
-    <input 
-      className="flex-1 p-3 bg-white border rounded-lg text-xs font-bold" 
-      placeholder="Ekstra Resim URL Yapıştır..."
-      value={ekstraResimUrl}
-      onChange={(e) => setEkstraResimUrl(e.target.value)}
-    />
-    <button 
-      type="button"
-      onClick={() => {
-        if(ekstraResimUrl) {
-          setFormData({...formData, icerikResimleri: [...(formData.icerikResimleri || []), ekstraResimUrl]});
-          setEkstraResimUrl('');
-        }
-      }}
-      className="bg-blue-600 text-white px-4 rounded-lg text-[10px] font-black hover:bg-black transition-all"
-    >
-      EKLE
-    </button>
-  </div>
-  
-  {/* ÖNİZLEME ALANI */}
-  <div className="flex gap-2 mt-2 flex-wrap">
-    {formData.icerikResimleri?.map((url: string, index: number) => (
-      <div key={index} className="relative group">
-        <img src={url} className="w-16 h-16 object-cover rounded-lg border shadow-sm" alt="icerik" />
-        <button 
-          type="button"
-          onClick={() => {
-            const yeniDizi = formData.icerikResimleri?.filter((_, i) => i !== index) || [];
-            setFormData({...formData, icerikResimleri: yeniDizi});
-          }}
-          className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black shadow-md"
-        >
-          X
-        </button>
-      </div>
-    ))}
-  </div>
-</div> {/* KANKA: İŞTE O EKSİK KAPANIŞ ETİKETİ BURASIYDI! */}                <select className="w-full p-4 bg-[#111] text-white rounded-xl text-xs outline-none cursor-pointer" value={formData.kategori} onChange={(e)=>setFormData({...formData, kategori: e.target.value})}>
-                  {[
-                    "GÜNDEM", "SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", 
-                    "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", 
-                    "KÜLTÜR SANAT", "EĞİTİM", "SAĞLIK", "EMLAK", 
-                    "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN", 
-                    "VIDEO GALERI", "FOTO GALERİ"
-                  ].map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-                <input className="w-full p-4 bg-gray-50 border-none rounded-xl text-xs font-bold" placeholder="Görsel URL" value={formData.resim} onChange={(e)=>setFormData({...formData, resim: e.target.value})} />
-                <button disabled={loading} className="w-full bg-red-600 text-white py-6 rounded-2xl shadow-xl hover:bg-black transition-all">
-                  {loading ? "BEKLE..." : editingId ? "GÜNCELLE" : "YAYINLA"}
-                </button>
+
+                {/* HABER İÇİ RESİMLER (ZATEN VARDI) */}
+                <div className="bg-gray-50 p-4 rounded-xl space-y-2 mt-4 border border-dashed border-gray-300 uppercase italic">
+                  <label className="text-[10px] font-black text-gray-500 uppercase italic">HABER İÇİ RESİMLER (URL)</label>
+                  <div className="flex gap-2">
+                    <input className="flex-1 p-3 bg-white border rounded-lg text-xs font-bold" placeholder="Ekstra Resim URL..." value={ekstraResimUrl} onChange={(e) => setEkstraResimUrl(e.target.value)} />
+                    <button type="button" onClick={() => { if(ekstraResimUrl) { setFormData({...formData, icerikResimleri: [...(formData.icerikResimleri || []), ekstraResimUrl]}); setEkstraResimUrl(''); } }} className="bg-blue-600 text-white px-4 rounded-lg text-[10px] font-black">EKLE</button>
+                  </div>
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {formData.icerikResimleri?.map((url: string, index: number) => (
+                      <div key={index} className="relative group">
+                        <img src={url} className="w-12 h-12 object-cover rounded-lg border shadow-sm" alt="icerik" />
+                        <button type="button" onClick={() => { const yeniDizi = formData.icerikResimleri?.filter((_:any, i:number) => i !== index); setFormData({...formData, icerikResimleri: yeniDizi}); }} className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]">X</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* KANKA: İŞTE O YENİ ÇOKLU KATEGORİ BÖLÜMÜ */}
+                <div className="space-y-3 pt-4 border-t border-dashed">
+                  <h4 className="text-[10px] text-red-600 font-black italic flex items-center gap-2">
+                    <FaIcons.FaTags/> KATEGORİLER (ÇOKLU SEÇİM)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {[
+                      "GÜNDEM", "SPOR", "YEREL SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", 
+                      "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", "KÜLTÜR SANAT", 
+                      "EĞİTİM", "SAĞLIK", "EMLAK", "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN"
+                    ].map((k: string) => {
+                      const seciliMi = formData.kategoriler?.includes(k);
+                      return (
+                        <div key={k} onClick={() => {
+                            const yeniListe = seciliMi 
+                              ? formData.kategoriler.filter((item: string) => item !== k) 
+                              : [...(formData.kategoriler || []), k];
+                            setFormData({...formData, kategoriler: yeniListe});
+                          }}
+                          className={`p-3 rounded-lg border-2 text-[10px] text-center cursor-pointer transition-all font-black italic uppercase
+                            ${seciliMi ? 'border-red-600 bg-red-600 text-white shadow-md scale-[0.98]' : 'bg-gray-50 text-gray-400 border-transparent hover:border-gray-200'}`}
+                        >
+                          {k}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ANA GÖRSEL VE YAYINLA BUTONU */}
+                <div className="space-y-4 pt-4 border-t">
+                  <input className="w-full p-4 bg-gray-50 border-none rounded-xl text-xs font-bold" placeholder="ANA GÖRSEL URL" value={formData.resim} onChange={(e)=>setFormData({...formData, resim: e.target.value})} />
+                  <button disabled={loading} type="submit" className="w-full bg-red-600 text-white py-6 rounded-2xl shadow-xl hover:bg-black transition-all font-black italic uppercase">
+                    {loading ? "BEKLE..." : editingId ? "GÜNCELLE" : "YAYINLA"}
+                  </button>
+                </div>
+
               </div>
             </div>
           </form>
@@ -422,6 +434,94 @@ const haberKaydet = async (e: React.FormEvent) => {
                       </div>
                     </div>
 
+                    {/* KANKA: DİKİNE REKLAM YÖNETİM PANELİ */}
+<div className="bg-red-50 p-6 rounded-2xl space-y-4 border border-red-100">
+  <h4 className="text-xs text-red-600 border-b border-red-200 pb-2 flex items-center gap-2">
+    <FaIcons.FaAd/> Dikine Reklam Ayarları (160x600)
+  </h4>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-1">
+      <label className="text-[10px] text-gray-500 font-black">SOL DİKİNE REKLAM URL</label>
+      <input 
+        className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
+        placeholder="https://... resim linki" 
+        value={siteAyarlari.solReklam || ''} 
+        onChange={(e)=>setSiteAyarlari({...siteAyarlari, solReklam: e.target.value})} 
+      />
+    </div>
+    <div className="space-y-1">
+      <label className="text-[10px] text-gray-500 font-black">SAĞ DİKİNE REKLAM URL</label>
+      <input 
+        className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
+        placeholder="https://... resim linki" 
+        value={siteAyarlari.sagReklam || ''} 
+        onChange={(e)=>setSiteAyarlari({...siteAyarlari, sagReklam: e.target.value})} 
+      />
+    </div>
+  </div>
+  <p className="text-[9px] text-red-400 font-bold italic">NOT: URL'yi boş bırakırsan ana sayfada o reklam alanı otomatik kapanır kanka!</p>
+</div>
+
+{/* KANKA: BURASI YENİ REKLAM SLİDER YÖNETİM ALANI */}
+<div className="bg-blue-50 p-6 rounded-2xl space-y-4 border border-blue-100 mt-6">
+  <h4 className="text-xs text-blue-600 border-b border-blue-200 pb-2 flex items-center gap-2 uppercase font-black italic">
+    <FaIcons.FaAd/> Ana Sayfa Slider Reklamlar (Linkli & Hareketli)
+  </h4>
+  
+  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+    <div className="md:col-span-5">
+      <label className="text-[9px] text-gray-400 font-black ml-1 uppercase">REKLAM GÖRSEL URL</label>
+      <input id="newResim" className="w-full p-3 bg-white border rounded-xl text-[10px] font-bold" placeholder="https://... resim linki" />
+    </div>
+    <div className="md:col-span-5">
+      <label className="text-[9px] text-gray-400 font-black ml-1 uppercase">TIKLANINCA GİDİLECEK LİNK</label>
+      <input id="newLink" className="w-full p-3 bg-white border rounded-xl text-[10px] font-bold" placeholder="https://... hedef site" />
+    </div>
+    <div className="md:col-span-2 flex items-end">
+      <button 
+        type="button"
+        onClick={() => {
+          const resim = (document.getElementById('newResim') as HTMLInputElement).value;
+          const link = (document.getElementById('newLink') as HTMLInputElement).value;
+          if(resim && link) {
+            setSiteAyarlari({
+              ...siteAyarlari, 
+              anaSayfaReklamlar: [...(siteAyarlari.anaSayfaReklamlar || []), { resim, link }]
+            });
+            (document.getElementById('newResim') as HTMLInputElement).value = '';
+            (document.getElementById('newLink') as HTMLInputElement).value = '';
+            alert("Reklam listeye eklendi kanka! 'Tümünü Mühürle' demeyi unutma. 🚀");
+          }
+        }}
+        className="w-full bg-blue-600 text-white font-black text-[10px] h-[42px] rounded-xl hover:bg-black transition-all uppercase italic"
+      >
+        LİSTEYE EKLE
+      </button>
+    </div>
+  </div>
+
+  {/* Ekli Reklamları Listeleme ve Silme */}
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+    {siteAyarlari.anaSayfaReklamlar?.map((rek: any, i: number) => (
+      <div key={i} className="group relative bg-white p-2 border rounded-xl shadow-sm hover:border-red-500 transition-all overflow-hidden">
+        <img src={rek.resim} className="h-16 w-full object-cover rounded-lg mb-1" />
+        <div className="text-[8px] font-bold text-gray-400 truncate uppercase italic">{rek.link}</div>
+        <button 
+          type="button"
+          onClick={() => {
+            const yeniList = siteAyarlari.anaSayfaReklamlar.filter((_: any, index: number) => index !== i);
+            setSiteAyarlari({...siteAyarlari, anaSayfaReklamlar: yeniList});
+          }}
+          className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+        >
+          <FaIcons.FaTrashAlt size={10}/>
+        </button>
+      </div>
+    ))}
+  </div>
+  <p className="text-[9px] text-blue-400 font-bold italic uppercase tracking-tighter">* Listeye ekledikten sonra en alttaki 'TÜMÜNÜ MÜHÜRLE' butonuna basman lazım kanka!</p>
+</div>
+
                     {/* KURUMSAL METİNLER */}
                     <div className="space-y-4 pt-4 border-t">
                        <div className="space-y-1"><label className="text-[10px] text-red-600 font-black">KÜNYE METNİ</label><textarea className="w-full p-4 bg-gray-50 rounded-xl h-24 text-[11px] normal-case font-medium border" value={siteAyarlari.kunyeMetni || ''} onChange={(e)=>setSiteAyarlari({...siteAyarlari, kunyeMetni: e.target.value})} /></div>
@@ -482,19 +582,19 @@ const haberKaydet = async (e: React.FormEvent) => {
             <td className="p-5 text-right flex justify-end gap-2 text-lg">
               {/* KANKA: İŞTE O KRİTİK DÜZENLEME BURADA! */}
               <button 
-                onClick={() => {
-                  setEditingId(h.id); 
-                  // Kanka: h.icerikResimleri yoksa || [] diyerek TypeScript'i susturuyoruz ve sistemi koruyoruz
-                  setFormData({ 
-                    ...h, 
-                    icerikResimleri: h.icerikResimleri || [] 
-                  } as any); 
-                  setTab('haber-ekle');
-                }} 
-                className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-all"
-              >
-                <FaIcons.FaEdit/>
-              </button>
+        onClick={() => {
+          setEditingId(h.id); 
+          setFormData({ 
+            ...h, 
+            kategoriler: h.kategoriler || [h.kategori] || ['GÜNDEM'], 
+            icerikResimleri: h.icerikResimleri || [] 
+          } as any); 
+          setTab('haber-ekle');
+        }} 
+        className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-all"
+      >
+        <FaIcons.FaEdit/>
+      </button>
               
               <button 
                 onClick={() => {
@@ -573,6 +673,77 @@ const haberKaydet = async (e: React.FormEvent) => {
              {iletisimMesajlari.length === 0 && <div className="p-10 text-center text-gray-400 italic">Henüz ihbar veya mesaj yok kanka! 😎</div>}
            </div>
         )}
+       
+        {/* KANKA: TAM BURAYA YAPIŞTIR */}
+        {tab === 'lig-merkezi' && (
+          <div className="space-y-8 font-black italic uppercase text-black">
+            <div className="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border-l-8 border-green-600">
+              <div>
+                <h3 className="text-2xl font-black italic">LİG VERİ MERKEZİ</h3>
+                <p className="text-[10px] text-gray-400 font-bold">Bot tarafından Firebase'e mühürlenen canlı veriler</p>
+              </div>
+              <div className="bg-green-100 text-green-600 px-4 py-2 rounded-full text-xs animate-pulse font-black">
+                BOT SİSTEMİ AKTİF
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* PUAN DURUMU */}
+              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <div className="bg-[#111] p-4 text-white text-xs flex items-center gap-2 font-black">
+                  <FaIcons.FaListOl className="text-green-500"/> PUAN DURUMU (GÜNCEL)
+                </div>
+                <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                  <table className="w-full text-left text-[10px] font-bold">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr className="border-b">
+                        <th className="p-3 text-center w-8">#</th>
+                        <th className="p-3">TAKIM</th>
+                        <th className="p-3 text-center">O</th>
+                        <th className="p-3 text-center">G</th>
+                        <th className="p-3 text-center text-red-600">P</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {puanDurumu.map((takim: any, i: number) => (
+                        <tr key={i} className={takim.team.name.includes('Kocaeli') ? 'bg-green-50' : ''}>
+                          <td className="p-3 text-center font-bold text-gray-400 border-r">{i + 1}</td>
+                          <td className="p-3 font-black text-[11px]">{takim.team.name}</td>
+                          <td className="p-3 text-center">{takim.played}</td>
+                          <td className="p-3 text-center text-green-600">{takim.won}</td>
+                          <td className="p-3 text-center font-black text-white bg-red-600">{takim.points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* FİKSTÜR */}
+              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <div className="bg-[#111] p-4 text-white text-xs flex items-center gap-2 font-black">
+                  <FaIcons.FaCalendarAlt className="text-blue-500"/> KOCAELİSPOR MAÇ TAKVİMİ
+                </div>
+                <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y">
+                  {fikstur.map((mac: any, i: number) => (
+                    <div key={i} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] text-gray-400 font-black tracking-widest">{mac.time}</span>
+                        <div className="flex items-center gap-2 text-[11px] font-black italic">
+                          <span className={mac.home.includes('Kocaeli') ? 'text-green-600' : 'text-gray-800'}>{mac.home}</span>
+                          <span className="text-red-600 text-[8px] bg-gray-100 px-1 rounded">VS</span>
+                          <span className={mac.away.includes('Kocaeli') ? 'text-green-600' : 'text-gray-800'}>{mac.away}</span>
+                        </div>
+                      </div>
+                      <div className="bg-green-600 text-white px-3 py-1 rounded text-[8px] font-black italic">MAÇ GÜNÜ</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
       <style jsx global>{`

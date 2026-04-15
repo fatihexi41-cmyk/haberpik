@@ -1,8 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/bot",
-      "schedule": "0 7 * * *"
+      "path": "/api/bot-haber",
+      "schedule": "0 4-21/2 * * *"
+    },
+    {
+      "path": "/api/bot-hizmet",
+      "schedule": "30 4,11,20 * * *"
     }
   ]
 }
