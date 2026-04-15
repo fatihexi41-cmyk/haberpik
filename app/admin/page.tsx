@@ -435,31 +435,59 @@ const haberKaydet = async (e: React.FormEvent) => {
                     </div>
 
                     {/* KANKA: DİKİNE REKLAM YÖNETİM PANELİ */}
-<div className="bg-red-50 p-6 rounded-2xl space-y-4 border border-red-100">
+<div className="bg-red-50 p-6 rounded-2xl space-y-6 border border-red-100">
   <h4 className="text-xs text-red-600 border-b border-red-200 pb-2 flex items-center gap-2">
     <FaIcons.FaAd/> Dikine Reklam Ayarları (160x600)
   </h4>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div className="space-y-1">
-      <label className="text-[10px] text-gray-500 font-black">SOL DİKİNE REKLAM URL</label>
-      <input 
-        className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
-        placeholder="https://... resim linki" 
-        value={siteAyarlari.solReklam || ''} 
-        onChange={(e)=>setSiteAyarlari({...siteAyarlari, solReklam: e.target.value})} 
-      />
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    
+    {/* SOL REKLAM AYARLARI */}
+    <div className="space-y-3 p-3 bg-white/50 rounded-xl border border-red-50">
+      <div className="space-y-1">
+        <label className="text-[10px] text-gray-500 font-black">SOL REKLAM GÖRSEL (URL)</label>
+        <input 
+          className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
+          placeholder="https://... resim linki" 
+          value={siteAyarlari.solReklam || ''} 
+          onChange={(e)=>setSiteAyarlari({...siteAyarlari, solReklam: e.target.value})} 
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[10px] text-red-600 font-black">SOL REKLAM TIKLAMA LİNKİ</label>
+        <input 
+          className="w-full p-3 bg-white border-red-200 border-2 rounded-xl font-bold text-[10px] normal-case" 
+          placeholder="url ekle" 
+          value={siteAyarlari.solReklamUrl || ''} 
+          onChange={(e)=>setSiteAyarlari({...siteAyarlari, solReklamUrl: e.target.value})} 
+        />
+      </div>
     </div>
-    <div className="space-y-1">
-      <label className="text-[10px] text-gray-500 font-black">SAĞ DİKİNE REKLAM URL</label>
-      <input 
-        className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
-        placeholder="https://... resim linki" 
-        value={siteAyarlari.sagReklam || ''} 
-        onChange={(e)=>setSiteAyarlari({...siteAyarlari, sagReklam: e.target.value})} 
-      />
+
+    {/* SAĞ REKLAM AYARLARI */}
+    <div className="space-y-3 p-3 bg-white/50 rounded-xl border border-red-50">
+      <div className="space-y-1">
+        <label className="text-[10px] text-gray-500 font-black">SAĞ REKLAM GÖRSEL (URL)</label>
+        <input 
+          className="w-full p-3 bg-white border rounded-xl font-bold text-[10px] normal-case" 
+          placeholder="https://... resim linki" 
+          value={siteAyarlari.sagReklam || ''} 
+          onChange={(e)=>setSiteAyarlari({...siteAyarlari, sagReklam: e.target.value})} 
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[10px] text-red-600 font-black">SAĞ REKLAM TIKLAMA LİNKİ</label>
+        <input 
+          className="w-full p-3 bg-white border-red-200 border-2 rounded-xl font-bold text-[10px] normal-case" 
+          placeholder="url ekle" 
+          value={siteAyarlari.sagReklamUrl || ''} 
+          onChange={(e)=>setSiteAyarlari({...siteAyarlari, sagReklamUrl: e.target.value})} 
+        />
+      </div>
     </div>
+
   </div>
-  <p className="text-[9px] text-red-400 font-bold italic">NOT: URL'yi boş bırakırsan ana sayfada o reklam alanı otomatik kapanır kanka!</p>
+  <p className="text-[9px] text-red-400 font-bold italic">NOT: Görsel URL'sini boş bırakırsan alan kapanır, Tıklama Linkini boş bırakırsan reklam sadece resim olarak kalır kanka!</p>
 </div>
 
 {/* KANKA: BURASI YENİ REKLAM SLİDER YÖNETİM ALANI */}

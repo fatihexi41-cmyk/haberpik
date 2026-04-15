@@ -98,13 +98,18 @@ export default function Home() {
   if (yukleniyor) return <div className="min-h-screen bg-black flex items-center justify-center font-black italic animate-pulse text-4xl text-red-600 uppercase">HABERPİK...</div>;
 
   return (
-    /* KANKA: REKLAMLARI VE ANA İÇERİĞİ YAN YANA DİZEN EN DIŞ KATMAN */
-    <div className="flex justify-center items-start gap-4 bg-gray-200 min-h-screen w-full">
+  <div className="bg-gray-200 min-h-screen w-full">
+    {/* ANA KAPSAYICI */}
+    <div className="max-w-[1150px] mx-auto relative flex justify-center">
       
-      {/* SOL DİKİNE REKLAM */}
+      {/* SOL REKLAM - Yana yapışık ve kayan (Sticky) */}
       {siteAyarlari?.solReklam && (
-        <div className="hidden xl:block sticky top-4 w-[160px] h-[600px] shrink-0 bg-white shadow-md mt-4 overflow-hidden">
-          <img src={siteAyarlari.solReklam} className="w-full h-full object-cover" alt="sol-reklam" />
+        <div className="hidden xl:block absolute -left-[175px] h-full">
+          <div className="sticky top-24 w-[160px] h-[600px]">
+            <a href={siteAyarlari?.solReklamUrl || "#"} target="_blank" rel="noopener noreferrer" className="block w-full h-full bg-white shadow-xl rounded-lg overflow-hidden border border-gray-300 group">
+              <img src={siteAyarlari.solReklam} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="sol-reklam" />
+            </a>
+          </div>
         </div>
       )}
     
@@ -703,13 +708,18 @@ export default function Home() {
 
 </main>
 
-      {/* SAĞ DİKİNE REKLAM */}
+      {/* SAĞ REKLAM - Yana yapışık ve kayan (Sticky) */}
       {siteAyarlari?.sagReklam && (
-        <div className="hidden xl:block sticky top-4 w-[160px] h-[600px] shrink-0 bg-white shadow-md mt-4 overflow-hidden">
-          <img src={siteAyarlari.sagReklam} className="w-full h-full object-cover" alt="sag-reklam" />
+        <div className="hidden xl:block absolute -right-[175px] h-full">
+          <div className="sticky top-24 w-[160px] h-[600px]">
+            <a href={siteAyarlari?.sagReklamUrl || "#"} target="_blank" rel="noopener noreferrer" className="block w-full h-full bg-white shadow-xl rounded-lg overflow-hidden border border-gray-300 group">
+              <img src={siteAyarlari.sagReklam} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="sag-reklam" />
+            </a>
+          </div>
         </div>
       )}
 
     </div>
-  );
-} // <--- HOME FONKSİYONUNU BİTİREN SON SÜSLÜ PARANTEZ
+  </div>
+);
+}
