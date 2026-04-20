@@ -92,23 +92,37 @@ async function futbolKaziyici(): Promise<FutbolVerisi> {
     fikstur = await page.evaluate(() => {
       const rows = Array.from(document.querySelectorAll('table tbody tr'));
       const durumYazilari = ["BŞL", "MS", "İY", "UZ", "PEN", "SAAT", "DURUM", "VS", "-", "BAŞLADI", "FİKSTÜR", "MAÇ"];
+      let sonBulunanTarih = ""; 
 
       return rows.map(row => {
         const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent?.trim() || "");
         
-        // KANKA: Satırdaki "çöp" olmayan gerçek kelimeleri ayıklıyoruz
+        // 1. ADIM: Tarih başlığını yakala
+        if (cells.length === 1 && cells[0].length > 5) {
+          sonBulunanTarih = cells[0];
+          return null;
+        }
+
+        // 2. ADIM: Skor hücresini (1-2 gibi) özel olarak yakalayalım
+        // Senin filtren takımları bulurken skoru eliyor, o yüzden skoru ayrıca çekiyoruz
+        const skorHucresi = cells.find(text => /^\d+-\d+$/.test(text)) || "VS";
+
+        // 3. ADIM: Senin çalışan takım filtresi (Dokunmadık)
         const temizHücreler = cells.filter(text => 
           text.length > 2 && 
           !durumYazilari.includes(text.toUpperCase()) &&
-          !text.includes(":") // Saati ayıkla (17:00 vs)
+          !text.includes(":") &&
+          !/^\d+-\d+$/.test(text)
         );
 
-        // Eğer en az 2 tane takım ismi bulduysak (Ev ve Deplasman)
+        // Eğer takımları bulduysak paketi yapalım
         if (temizHücreler.length >= 2) {
           return {
-            time: cells[0] || "Belli Değil", // İlk hücre genelde saattir
+            date: sonBulunanTarih,
+            time: cells[0] || "Belli Değil",
             home: temizHücreler[0],
-            away: temizHücreler[1]
+            away: temizHücreler[1],
+            score: skorHucresi // ARTIK SKOR DA VAR KANKA!
           };
         }
         return null;

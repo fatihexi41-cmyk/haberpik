@@ -13,6 +13,24 @@ const slugOlustur = (metin: string) => {
     .replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c');
 };
 
+// --- KANKA: BAŞLIK BENZERLİK KONTROLÜ ---
+const benzerlikVarMi = (yeniBaslik: string, eskiBasliklar: string[]) => {
+  const temizle = (s: string) => s.toLowerCase()
+    .replace(/[^a-z0-9ğüşıöç ]/g, "")
+    .split(" ")
+    .filter(k => k.length > 2);
+    
+  const yeniKelimeler = temizle(yeniBaslik);
+  
+  for (const eski of eskiBasliklar) {
+    const eskiKelimeler = temizle(eski);
+    const ortak = yeniKelimeler.filter(k => eskiKelimeler.includes(k)).length;
+    const oran = ortak / Math.max(yeniKelimeler.length, eskiKelimeler.length);
+    if (oran > 0.6) return true; 
+  }
+  return false;
+};
+
 // --- RESİM AVCISI ---
 async function akilliResimAvcisi(page: any) {
   return await page.evaluate(() => {
@@ -58,15 +76,14 @@ async function linkleriTopla(browser: any, siteUrl: string) {
 
 // --- HABER DETAYINA SIZMA ---
 async function habereSizVeCek(browser: any, url: string) {
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 800 });
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
-    
     await page.evaluate(() => window.scrollBy(0, 600));
     await new Promise(r => setTimeout(r, 2000));
-
     const resim = await akilliResimAvcisi(page);
     const icerik = await page.evaluate(() => {
       const h1 = document.querySelector('h1')?.innerText?.trim() || '';
@@ -76,16 +93,16 @@ async function habereSizVeCek(browser: any, url: string) {
         .join('\n\n');
       return { h1, metin };
     });
-    await page.close();
     return { ...icerik, resim };
   } catch { return null; }
+  finally { if (page) await (page as any).close(); }
 }
 
 async function resmiBase64Yap(url: string) {
   if (!url) return null;
   try {
     const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
-    if (res.data.length > 1024 * 1024) return null;
+    if (res.data.length > 800 * 1024) return null; 
     return {
       inlineData: { data: Buffer.from(res.data).toString("base64"), mimeType: res.headers["content-type"] || "image/jpeg" },
     };
@@ -107,30 +124,30 @@ export async function GET() {
       headless: true,
     });
 
-    const snap = await getDocs(query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(50)));
+    const snap = await getDocs(query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(60)));
     const mevcutLinkler = snap.docs.map(d => d.data().kaynak);
-    const sonHaberBasliklari = snap.docs.map(d => d.data().baslik).join(" | ");
+    const sonHaberBasliklariDizisi = snap.docs.map(d => d.data().baslik) as string[];
 
     const SITELER = [
-      "https://kocaelinabiz.com", 
-      "https://www.ozgurkocaeli.com.tr",
-      "https://www.cagdaskocaeli.com.tr", 
-      "https://www.kocaeligazetesi.com.tr",
-      "https://www.cnnturk.com", 
-      "https://www.haber7.com"
+      "https://kocaelinabiz.com", "https://www.ozgurkocaeli.com.tr",
+      "https://www.cagdaskocaeli.com.tr", "https://www.kocaeligazetesi.com.tr",
+      "https://www.cnnturk.com", "https://www.haber7.com"
     ];
 
-    // KANKA: RASTGELE SIRALAMA MÜHÜRÜ
     SITELER.sort(() => Math.random() - 0.5);
 
     for (const site of SITELER) {
       console.log(`🔎 Şantiyeye girildi: ${site}`);
       const linkler = await linkleriTopla(browser, site);
-      
-      let siteSayac = 0; // KANKA: Her site için kendi kotası
+      let siteSayac = 0; 
 
       for (const haber of linkler) {
         if (mevcutLinkler.includes(haber.link) || mevcutLinkler.includes(haber.link + "/")) continue;
+
+        if (benzerlikVarMi(haber.baslik, sonHaberBasliklariDizisi)) {
+          console.log(`⏩ Benzer haber atlandı: ${haber.baslik}`);
+          continue;
+        }
 
         const ham = await habereSizVeCek(browser, haber.link);
         if (!ham || ham.metin.length < 400 || !ham.resim) continue;
@@ -139,7 +156,7 @@ export async function GET() {
         if (!resimData) continue;
 
         const prompt = `Sen Haberpik baş editörüsün. Sana gelen haberi incele.
-DİKKAT: Yayındaki son haber başlıkları: [${sonHaberBasliklari}]. Eğer bu haber bunlardan biriyle içerik olarak aynıysa kesinlikle "durum": "pas" de.
+DİKKAT: Yayındaki son haber başlıkları: [${sonHaberBasliklariDizisi.join(" | ")}]. Eğer bu haber bunlardan biriyle içerik olarak aynıysa kesinlikle "durum": "pas" de.
 KURALLAR:
 1. "baslik", "ozet" ve en az 300 kelimelik zengin bir "icerik" yaz.
 2. KATEGORİ LİSTESİ: [GÜNDEM, SPOR, YEREL SPOR, SİYASET, ASAYİŞ, EKONOMİ, TÜRKİYE HABERLERİ, DÜNYA, BİLİM TEKNOLOJİ, KÜLTÜR SANAT, EĞİTİM, SAĞLIK, EMLAK, OTOMOBİL, MAGAZİN, HAYATIN İÇİNDEN]. Bunlardan en uygun 1-2 tanesini seç.
@@ -158,39 +175,24 @@ SADECE JSON: {"baslik": "...", "ozet": "...", "icerik": "...", "kategoriler": ["
 
           if (data.durum === "aktif") {
             const anaKategori = data.kategoriler[0] || "GÜNDEM";
-            
             await addDoc(collection(db, "haberler"), { 
-              baslik: data.baslik,
-              ozet: data.ozet,
-              icerik: data.icerik,
-              kategoriler: data.kategoriler,
-              kategori: anaKategori,
-              kategori_slug: slugOlustur(anaKategori),
-              manset: data.mansetEkle,
-              slider: data.sliderEkle,
-              sonDakika: data.sonDakika,
-              trendEkle: data.trendEkle,
-              anahtarKelimeler: data.anahtarKelimeler || "",
+              baslik: data.baslik, ozet: data.ozet, icerik: data.icerik,
+              kategoriler: data.kategoriler, kategori: anaKategori,
+              kategori_slug: slugOlustur(anaKategori), manset: data.mansetEkle,
+              slider: data.sliderEkle, sonDakika: data.sonDakika,
+              trendEkle: data.trendEkle, anahtarKelimeler: data.anahtarKelimeler || "",
               metaAciklama: data.metaAciklama || "",
               resim: `data:${resimData.inlineData.mimeType};base64,${resimData.inlineData.data}`,
-              tarih: new Date(),
-              guncellemeTarihi: new Date(),
-              kaynak: haber.link,
-              yazar: "HaberPik Bot",
-              durum: "aktif",
-              okunma: 0,
-              icerikResimleri: []
+              tarih: new Date(), guncellemeTarihi: new Date(), kaynak: haber.link,
+              yazar: "HaberPik Bot", durum: "aktif", okunma: 0, icerikResimleri: []
             });
             sayac++;
-            siteSayac++; // KANKA: Bu siteden başarılı kayıt sayısını artır
-            console.log(`✅ [${site}] -> Yayınlandı: ${data.baslik} (${anaKategori})`);
+            siteSayac++; 
+            console.log(`✅ [${site}] -> Yayınlandı: ${data.baslik}`);
           }
         } catch (e) { console.log("⚠️ Gemini 2.5 pas geçti."); }
         
-        if (siteSayac >= 5) {
-          console.log(`🏠 ${site} için kota (5) doldu, diğer siteye geçiliyor...`);
-          break; // KANKA: Bu siteden 5 tane aldık, diğer dükkana geçiyoruz
-        }
+        if (siteSayac >= 5) break; 
         if (sayac >= 25) break; 
       }
       if (sayac >= 25) break;

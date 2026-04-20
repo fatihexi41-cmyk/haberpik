@@ -71,7 +71,12 @@ const [ekstraResimUrl, setEkstraResimUrl] = useState(''); // Input için geçici
   const [dikeyVideoForm, setDikeyVideoForm] = useState({ baslik: '', videoUrl: '', kapakResmi: '' });
 
 useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
+  const unsubAuth = onAuthStateChanged(auth, (u) => {
+    if (!u) {
+      // KANKA: Eğer kullanıcı yoksa direkt login'e şutla
+      window.location.href = "/login"; 
+      return;
+    }
       setUser(u);
       if (u) {
         // 1. Haberler
@@ -193,7 +198,12 @@ const haberKaydet = async (e: React.FormEvent) => {
     }
   };
 
-  if (!user) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white font-black italic uppercase">Bağlanılıyor...</div>;
+  if (!user) return (
+  <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center text-white font-black italic uppercase">
+    <div className="animate-spin mb-4 text-red-600 text-4xl"><FaIcons.FaSpinner /></div>
+    Giriş Yetkisi Kontrol Ediliyor kanka...
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-[#f4f7f6] flex font-sans fixed inset-0 z-[9999] overflow-hidden text-black">

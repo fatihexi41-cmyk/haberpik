@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isAdminPage = pathname?.startsWith('/admin') || pathname?.startsWith('/login');
   const [menuAcik, setMenuAcik] = useState(false);
   const [aramaInput, setAramaInput] = useState(""); 
   const [havaDurumu, setHavaDurumu] = useState({ derece: "10", durum: "GÜNEŞLİ" });
@@ -51,32 +52,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  
   useEffect(() => {
-    // KANKA: 1. Ayarları Dinle
-    const unsubSettings = onSnapshot(doc(db, "ayarlar", "genel"), (doc) => {
-      if (doc.exists()) setSiteAyarlari(doc.data() as any);
+    // KANKA: Eğer admin veya login sayfasındaysak Firebase dinleyicilerini HİÇ başlatma
+    if (isAdminPage) return;
+
+    // 1. Ayarları Dinle
+    const unsubSettings = onSnapshot(doc(db, "ayarlar", "genel"), (docSnap) => {
+      if (docSnap.exists()) setSiteAyarlari(docSnap.data());
     });
 
-    // KANKA: 2. Botun güncellediği Namaz ve Hava Durumunu "Anlık" Dinle
-const unsubServices = onSnapshot(doc(db, "ayarlar", "hizmetler"), (doc) => {
-  if (doc.exists()) {
-    const data = doc.data();
-    // Bot hava durumu verisini girdiyse ekrana basıyoruz
-    if (data.hava) {
-      setHavaDurumu({
-        derece: data.hava.derece.toString(),
-        durum: data.hava.durum.toUpperCase()
-      });
-    }
-    if (data.namaz) setNamazVakitleri(data.namaz);
-  }
-});
+    // 2. Botun güncellediği Namaz ve Hava Durumunu Dinle
+    const unsubServices = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.hava) {
+          setHavaDurumu({
+            derece: data.hava.derece.toString(),
+            durum: data.hava.durum.toUpperCase()
+          });
+        }
+        if (data.namaz) setNamazVakitleri(data.namaz);
+      }
+    });
 
-return () => {
-  if (typeof unsubSettings === 'function') unsubSettings();
-  if (typeof unsubServices === 'function') unsubServices();
-};
-  }, []);
+    return () => {
+      unsubSettings();
+      unsubServices();
+    };
+    // KANKA BURASI KRİTİK: isAdminPage değiştiğinde (yani admin'e girip çıkınca) bu blok kendini günceller
+  }, [isAdminPage]);
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -96,9 +101,17 @@ return () => {
     <html lang="tr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${isDarkMode ? 'dark' : ''}`}>
       <body className={`min-h-full transition-colors duration-300 ${isDarkMode ? 'bg-[#111] text-white' : 'bg-[#e6e6e6] text-[#111]'} font-sans selection:bg-red-600 selection:text-white flex flex-col`}>
         
-        <div className="fixed top-0 left-0 w-full h-1 z-[9999]">
-          <div className="h-full bg-red-600 transition-all duration-150" style={{ width: `${scrollProgress}%` }}></div>
-        </div>
+        {isAdminPage ? (
+          /* KANKA: ADMİN VE LOGİN İÇİN TERTEMİZ BAĞIMSIZ ALAN */
+          <main className="flex-grow">
+            {children}
+          </main>
+        ) : (
+          /* KANKA: NORMAL SİTE DÜZENİ BURADAN BAŞLIYOR */
+          <>
+            <div className="fixed top-0 left-0 w-full h-1 z-[9999]">
+              <div className="h-full bg-red-600 transition-all duration-150" style={{ width: `${scrollProgress}%` }}></div>
+            </div>
 
         {/* YANDAN MENÜ */}
         <div className={`fixed inset-y-0 right-0 z-[999] w-80 bg-[#111] shadow-2xl transform ${menuAcik ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out border-l border-red-600/30`}>
@@ -318,7 +331,9 @@ return () => {
             </div>
           </div>
         </footer>
-      </body>
-    </html>
+        </> // KANKA BURASI EKSİKTİ, NORMAL SİTE PAKETİNİ KAPATTIK
+      )}
+    </body>
+  </html>
   );
 }
