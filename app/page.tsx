@@ -74,9 +74,15 @@ export default function Home() {
 
   // KANKA: Ana filtreleme fonksiyonu artık diziyi tarıyor
   const getKat = (kat: string, l: number = 10) => 
-  haberler.filter(h => 
-    h.kategoriler?.some((k: string) => k.trim().toUpperCase() === kat.toUpperCase())
-  ).slice(0, l);
+haberler.filter(h => {
+  const aranan = kat.toUpperCase().trim();
+  
+  const kategorilerDizisi = Array.isArray(h.kategoriler) 
+    ? h.kategoriler.map((x:any) => x.toUpperCase().trim()) 
+    : [ (h.kategori || "").toUpperCase().trim() ];
+
+  return kategorilerDizisi.includes(aranan);
+}).slice(0, l);
 
   const sliderHaberler = haberler.filter(h => h.sliderEkle).length > 0 ? haberler.filter(h => h.sliderEkle) : haberler.slice(0, 20);
   const sonDakikaHaberleri = haberler.filter(h => h.sonDakika);

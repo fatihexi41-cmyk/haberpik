@@ -59,7 +59,7 @@ export default function AdminPremiumV2() {
 
   const [formData, setFormData] = useState<any>({
     baslik: '', ozet: '', icerik: '', resim: '', 
-    kategoriler: ['GÜNDEM'], // Kanka burayı 'any' yaparak TS'yi susturduk
+    kategoriler: [], // Kanka burayı 'any' yaparak TS'yi susturduk
     mansetEkle: false, sliderEkle: false, sonDakika: false, trendEkle: false,
     anahtarKelimeler: '', metaAciklama: '', yazar: 'Admin', durum: 'aktif',
     icerikResimleri: []
@@ -137,14 +137,17 @@ const haberKaydet = async (e: React.FormEvent) => {
     };
 
     // KANKA KONUM: Burası çok kritik. Ana sayfanın tanıdığı isimleri buraya mühürlüyoruz.
+    // KANKA KONUM: Çoklu kategori ve Slider/Sütun ayrımı için mühürleme burası
     const mühürlüVeri = { 
-      ...formData, 
-      kategori_slug: slugOlustur(formData.kategoriler?.[0] || 'gundem'),
-      kategori: formData.kategoriler?.[0] || 'GÜNDEM',
-      manset: formData.mansetEkle || false, 
-      slider: formData.sliderEkle || false,
-      guncellemeTarihi: new Date() 
-    };
+  ...formData, 
+  // KANKA: Hem dizi hem tekil alanı BÜYÜK HARF yapıyoruz
+  kategoriler: formData.kategoriler.map((k: string) => k.toUpperCase().trim()),
+  kategori: formData.kategoriler?.[0]?.toUpperCase().trim() || 'GÜNDEM', 
+  kategori_slug: slugOlustur(formData.kategoriler?.[0] || 'gundem'),
+  manset: formData.mansetEkle || false, 
+  slider: formData.sliderEkle || false,
+  guncellemeTarihi: new Date() 
+};
 
     try {
       if (editingId) {
@@ -619,16 +622,18 @@ const haberKaydet = async (e: React.FormEvent) => {
             <td className="p-5 truncate max-w-md font-bold">{h.baslik}</td>
             <td className="p-5 text-right flex justify-end gap-2 text-lg">
               {/* KANKA: İŞTE O KRİTİK DÜZENLEME BURADA! */}
-              <button 
-        onClick={() => {
-          setEditingId(h.id); 
-          setFormData({ 
-            ...h, 
-            kategoriler: h.kategoriler || [h.kategori] || ['GÜNDEM'], 
-            icerikResimleri: h.icerikResimleri || [] 
-          } as any); 
-          setTab('haber-ekle');
-        }} 
+              <button  
+                onClick={() => {
+                  setEditingId(h.id); 
+                  // KANKA: Haberin içindeki kategoriler dizisini formData'ya tam uyumlu paslıyoruz
+                  const haberVerisi = {
+                    ...h,
+                    kategoriler: Array.isArray(h.kategoriler) ? h.kategoriler : (h.kategori ? [h.kategori] : []),
+                    icerikResimleri: h.icerikResimleri || []
+                  };
+                  setFormData(haberVerisi as any); 
+                  setTab('haber-ekle');
+                }}
         className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-all"
       >
         <FaIcons.FaEdit/>

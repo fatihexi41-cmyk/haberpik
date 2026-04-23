@@ -39,10 +39,17 @@ export default function KategoriSayfasi() {
         const tumHaberler = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         const filtrelenmis = tumHaberler.filter((h: any) => {
-          const kategori = (h.kategori || "").toLowerCase();
-          const kategoriSlug = (h.kategori_slug || "").toLowerCase();
-          return kategori.includes(slugLower) || kategoriSlug.includes(slugLower);
-        });
+  const slugUpper = slugRaw.toUpperCase().trim(); // Süzülen kategori adını büyüt
+
+  const yeniKategoriler = Array.isArray(h.kategoriler) 
+    ? h.kategoriler.map((k:any) => k.toUpperCase().trim()) 
+    : [];
+
+  const eskiKategori = (h.kategori || "").toUpperCase().trim();
+
+  // KANKA: Artık her iki taraf da büyük harf, kaçışı yok!
+  return yeniKategoriler.includes(slugUpper) || eskiKategori === slugUpper;
+});
 
         setHaberler(filtrelenmis);
       } catch (error) {
