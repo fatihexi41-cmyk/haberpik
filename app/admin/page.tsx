@@ -292,25 +292,35 @@ const haberKaydet = async (e: React.FormEvent) => {
                   </h4>
                   <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                     {[
-                      "GÜNDEM", "SPOR", "YEREL SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", 
-                      "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", "KÜLTÜR SANAT", 
-                      "EĞİTİM", "SAĞLIK", "EMLAK", "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN"
-                    ].map((k: string) => {
-                      const seciliMi = formData.kategoriler?.includes(k);
-                      return (
-                        <div key={k} onClick={() => {
-                            const yeniListe = seciliMi 
-                              ? formData.kategoriler.filter((item: string) => item !== k) 
-                              : [...(formData.kategoriler || []), k];
-                            setFormData({...formData, kategoriler: yeniListe});
-                          }}
-                          className={`p-3 rounded-lg border-2 text-[10px] text-center cursor-pointer transition-all font-black italic uppercase
-                            ${seciliMi ? 'border-red-600 bg-red-600 text-white shadow-md scale-[0.98]' : 'bg-gray-50 text-gray-400 border-transparent hover:border-gray-200'}`}
-                        >
-                          {k}
-                        </div>
-                      );
-                    })}
+  "GÜNDEM", "SPOR", "YEREL SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", 
+  "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", "KÜLTÜR SANAT", 
+  "EĞİTİM", "SAĞLIK", "EMLAK", "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN"
+].map((k: string) => {
+  
+  // KANKA: BURASI KRİTİK! Botun getirdiği 'kategoriler' dizisinde bu kategori var mı diye bakıyoruz.
+  // Eğer dizi yoksa (eski haber), tekil 'kategori' alanına bakıyoruz.
+  const seciliMi = formData.kategoriler?.includes(k) || formData.kategori === k;
+  
+  return (
+    <div key={k} onClick={() => {
+        const yeniListe = seciliMi 
+          ? (formData.kategoriler || []).filter((item: string) => item !== k) 
+          : [...(formData.kategoriler || []), k];
+        
+        // KANKA: Tıkladığında hem diziyi hem de ilk seçileni tekil kategori alanına mühürlüyoruz
+        setFormData({
+          ...formData, 
+          kategoriler: yeniListe,
+          kategori: yeniListe[0] || '' // İlk seçileni ana kategori yap
+        });
+      }}
+      className={`p-3 rounded-lg border-2 text-[10px] text-center cursor-pointer transition-all font-black italic uppercase
+        ${seciliMi ? 'border-red-600 bg-red-600 text-white shadow-md scale-[0.98]' : 'bg-gray-50 text-gray-400 border-transparent hover:border-gray-200'}`}
+    >
+      {k}
+    </div>
+  );
+})}
                   </div>
                 </div>
 

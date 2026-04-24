@@ -1,10 +1,13 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  // KANKA: Local'deki .env dosyasından bakıp burayı doldur, sunucunun insafına bırakma
   apiKey: "AIzaSyDPBCVpJETt8jpYLV4PP8XpMI_-JKTcJyE", 
   authDomain: "kocaelihaber-e779e.firebaseapp.com",
   projectId: "kocaelihaber-e779e",
@@ -13,8 +16,17 @@ const firebaseConfig = {
   appId: "1:980487271491:web:9cbd1898a59d441d2350f6"
 };
 
+// 1. App'i Başlat
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+// 2. KANKA: SİHİRLİ DOKUNUŞ BURASI! 
+// Firestore'u özel cache ayarlarıyla başlatıyoruz. 
+// Bu ayar "sayfa yenileyince gelme" ve "yavaş bağlanma" olayını bitirir.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);

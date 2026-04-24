@@ -101,7 +101,11 @@ haberler.filter(h => {
   h.kategoriler?.some(k => k.trim().toUpperCase() === "YEREL SPOR")
 ).slice(0, 8);
 
-  if (yukleniyor) return <div className="min-h-screen bg-black flex items-center justify-center font-black italic animate-pulse text-4xl text-red-600 uppercase">HABERPİK...</div>;
+  if (yukleniyor) return (
+  <div className="min-h-screen bg-black flex items-center justify-center font-black italic animate-pulse text-4xl text-red-600 uppercase">
+    HABERPİK...
+  </div>
+  );
 
   return (
   <div className="bg-gray-200 min-h-screen w-full">
