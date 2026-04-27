@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, getDocs, limit, doc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, limit, where, doc, startAfter, QueryDocumentSnapshot } from "firebase/firestore";
 import Link from 'next/link';
 import * as FaIcons from 'react-icons/fa';
 
@@ -16,72 +16,91 @@ export default function KategoriSayfasi() {
   const [fikstur, setFikstur] = useState<any[]>([]); // KANKA: Bunu ekledik
   const [aktifSekme, setAktifSekme] = useState<'puan' | 'fikstur'>('puan'); // Sekme için
   const [sporYukleniyor, setSporYukleniyor] = useState(false);
-
+  const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [bittiMi, setBittiMi] = useState(false);
   const slugRaw = params?.slug ? decodeURIComponent(params.slug as string) : "";
   const isSpor = slugRaw.toLowerCase().includes("spor");
   const isFotoGaleri = slugRaw.includes("foto-galeri");
   const isVideoGaleri = slugRaw.includes("video-galeri");
 
-  useEffect(() => {
+  const fetchData = async (isMore = false) => {
+  try {
     if (!slugRaw) return;
-    setYukleniyor(true);
+    if (isMore) setDahaYukleniyor(true); else setYukleniyor(true);
 
-    const fetchData = async () => {
-      try {
-        const slugLower = slugRaw.toLowerCase();
-        const q = query(
-          collection(db, "haberler"),
-          orderBy("tarih", "desc"),
-          limit(100)
-        );
+    const tumKategoriler = ["GÜNDEM", "SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", "KÜLTÜR SANAT", "EĞİTİM", "SAĞLIK", "EMLAK", "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN", "VİDEO GALERİ", "FOTO GALERİ"];
 
-        const snapshot = await getDocs(q);
-        const tumHaberler = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const filtrelenmis = tumHaberler.filter((h: any) => {
-  const slugUpper = slugRaw.toUpperCase().trim(); // Süzülen kategori adını büyüt
+    const slugUpper = tumKategoriler.find(k => 
+      k.toLowerCase().replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/ /g, '-') === slugRaw.toLowerCase()
+    ) || slugRaw.toUpperCase().replace(/-/g, ' ');
 
-  const yeniKategoriler = Array.isArray(h.kategoriler) 
-    ? h.kategoriler.map((k:any) => k.toUpperCase().trim()) 
-    : [];
+    let q = query(
+      collection(db, "haberler"),
+      where("kategoriler", "array-contains", slugUpper),
+      orderBy("tarih", "desc"),
+      limit(12) // Kanka 12-12 çekmek daha şık durur
+    );
 
-  const eskiKategori = (h.kategori || "").toUpperCase().trim();
-
-  // KANKA: Artık her iki taraf da büyük harf, kaçışı yok!
-  return yeniKategoriler.includes(slugUpper) || eskiKategori === slugUpper;
-});
-
-        setHaberler(filtrelenmis);
-      } catch (error) {
-        console.error("Firebase hatası kanka:", error);
-      } finally {
-        setYukleniyor(false);
-      }
-    };
-
-    fetchData();
-
-    // SPOR VERİSİ TAKİBİ (Firebase Canlı Bağlantı)
-    let unsubSpor: (() => void) | undefined;
-
-    if (isSpor) {
-      setSporYukleniyor(true);
-      // Kanka RapidAPI bitti, artık direkt bizim botun yazdığı 'hizmetler' dökümanına bakıyoruz
-      unsubSpor = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setPuanDurumu(data.lig_durumu || []);
-          // KANKA: Botun getirdiği fikstürü buraya bağlıyoruz
-          setFikstur(data.super_lig_fikstur || data.fikstur || []); 
-        }
-        setSporYukleniyor(false);
-      });
+    // EĞER DAHA FAZLA BUTONUNA BASILDIYSA:
+    if (isMore && lastDoc) {
+      q = query(q, startAfter(lastDoc));
     }
 
-    return () => {
-      if (unsubSpor) unsubSpor();
-    };
-  }, [slugRaw, isSpor]);
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      setBittiMi(true);
+    } else {
+      const yeniHaberler = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1]); // Son dokümanı hafızaya al
+      
+      if (isMore) {
+        setHaberler(prev => [...prev, ...yeniHaberler]); // Eskilerin üzerine ekle
+      } else {
+        setHaberler(yeniHaberler); // İlk açılışsa listeyi oluştur
+        setBittiMi(snapshot.docs.length < 12);
+      }
+    }
+  } catch (error: any) {
+    console.error("Firebase hatası:", error);
+  } finally {
+    setYukleniyor(false);
+    setDahaYukleniyor(false);
+  }
+};
+
+  useEffect(() => {
+  if (!slugRaw) return;
+
+  // Her kategori değişiminde sayfayı sıfırla kanka
+  setLastDoc(null);
+  setBittiMi(false);
+  
+  // Haberleri çek
+  fetchData();
+
+  // SPOR VERİSİ TAKİBİ (Fikstür burası sayesinde düzelir)
+  let unsubSpor: (() => void) | undefined;
+
+  if (isSpor) {
+    setSporYukleniyor(true);
+    // Kanka 'ayarlar' koleksiyonundaki 'hizmetler' dökümanına bağlanıyoruz
+    unsubSpor = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPuanDurumu(data.lig_durumu || []);
+        // Botun getirdiği fikstür verilerini buraya mühürlüyoruz
+        setFikstur(data.super_lig_fikstur || data.fikstur || []); 
+      }
+      setSporYukleniyor(false);
+    });
+  }
+
+  return () => {
+    if (unsubSpor) unsubSpor();
+  };
+}, [slugRaw, isSpor]);
 
   if (yukleniyor) return <div className="min-h-screen bg-white flex items-center justify-center font-black italic animate-pulse text-2xl text-red-600 uppercase tracking-tighter">BAĞLANILIYOR...</div>;
 
@@ -99,60 +118,65 @@ export default function KategoriSayfasi() {
 
       <div className={`grid grid-cols-1 ${isSpor ? 'lg:grid-cols-12' : 'md:grid-cols-1'} gap-8`}>
         
-        {/* SOL TARAF: HABER LİSTESİ */}
+        {/* SOL TARAF: HABER LİSTESİ VE BUTON PAKETİ */}
         <div className={`${isSpor ? 'lg:col-span-8' : ''}`}>
           {haberler.length > 0 ? (
-            <div className={`grid grid-cols-1 md:grid-cols-2 ${isSpor ? 'lg:grid-cols-2' : 'lg:grid-cols-4'} gap-4`}>
-              {haberler.map((h) => (
-                <Link href={`/haber/${h.id}`} key={h.id} className="group bg-white border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden flex flex-col h-full">
-                  <div className="aspect-video overflow-hidden relative">
-                    <img src={h.resim} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={h.baslik} />
-                    
-                    {(isFotoGaleri || h.kategori === "FOTO GALERİ") && (
-                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-white/90 p-3 rounded-full text-red-600 shadow-xl">
-                          <FaIcons.FaCamera size={20} />
-                        </div>
+            <>
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${isSpor ? 'lg:grid-cols-2' : 'lg:grid-cols-4'} gap-4`}>
+                {haberler.map((h) => (
+                  <Link href={`/haber/${h.id}`} key={h.id} className="group bg-white border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+                    <div className="aspect-video overflow-hidden relative">
+                      <img src={h.resim} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={h.baslik} />
+                      <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 italic uppercase shadow-lg">
+                        {h.kategori}
                       </div>
-                    )}
-                    {(isVideoGaleri || h.kategori === "VİDEO GALERİ") && (
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <div className="bg-red-600 p-3 rounded-full text-white shadow-xl group-hover:scale-125 transition-transform">
-                          <FaIcons.FaPlay size={18} className="ml-0.5" />
-                        </div>
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col justify-between bg-white">
+                      <h3 className="text-sm font-black uppercase italic leading-tight line-clamp-3 group-hover:text-red-600 transition-colors tracking-tighter">
+                        {h.baslik}
+                      </h3>
+                      <div className="mt-4 pt-3 border-t border-gray-50 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase italic">
+                        <span><FaIcons.FaCalendarAlt className="inline mr-1"/> {h.tarih?.seconds ? new Date(h.tarih.seconds * 1000).toLocaleDateString('tr-TR') : 'YENİ'}</span>
+                        <span className="text-red-600 font-black uppercase">{h.kategori === "VİDEO GALERİ" ? "İZLE →" : "İNCELE →"}</span>
                       </div>
-                    )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
 
-                    <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 italic uppercase shadow-lg">
-                      {h.kategori}
-                    </div>
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between bg-white">
-                    <h3 className="text-sm font-black uppercase italic leading-tight line-clamp-3 group-hover:text-red-600 transition-colors tracking-tighter">
-                      {h.baslik}
-                    </h3>
-                    <div className="mt-4 pt-3 border-t border-gray-50 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase italic">
-                      <span><FaIcons.FaCalendarAlt className="inline mr-1"/> {h.tarih?.seconds ? new Date(h.tarih.seconds * 1000).toLocaleDateString('tr-TR') : 'YENİ'}</span>
-                      <span className="text-red-600 font-black uppercase">{h.kategori === "VİDEO GALERİ" ? "İZLE →" : "İNCELE →"}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+              {/* KANKA: DAHA FAZLA BUTONU SOL TARAFIN (COL-SPAN-8) İÇİNE GİRDİ */}
+              {!bittiMi && haberler.length >= 12 && (
+                <div className="mt-12 flex justify-center">
+                  <button
+                    onClick={() => fetchData(true)}
+                    disabled={dahaYukleniyor}
+                    className="bg-[#111] text-white px-10 py-4 font-black italic uppercase tracking-tighter hover:bg-red-600 transition-all shadow-xl disabled:opacity-50 flex items-center gap-3"
+                  >
+                    {dahaYukleniyor ? (
+                      <> <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> YÜKLENİYOR... </>
+                    ) : (
+                      <> <FaIcons.FaPlus /> DAHA FAZLA HABER </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {bittiMi && haberler.length > 0 && (
+                <p className="text-center text-gray-400 font-black italic mt-10 uppercase tracking-widest">BU KATEGORİNİN SONUNA GELDİNİZ. 🏁</p>
+              )}
+            </>
           ) : (
             <div className="py-20 text-center">
                 <FaIcons.FaRegFolderOpen size={64} className="mx-auto text-gray-200 mb-4"/>
-                <p className="text-gray-400 font-black italic uppercase">İçerik bulunamadı kanka.</p>
+                <p className="text-gray-400 font-black italic uppercase">İçerik bulunamadı.</p>
             </div>
           )}
         </div>
 
-        {/* SAĞ TARAF: SPOR BÖLÜMÜNE ÖZEL PUAN DURUMU & FİKSTÜR */}
+        {/* SAĞ TARAF: SPOR BÖLÜMÜ - ARTIK YUKARIYA ÇIKTI */}
         {isSpor && (
           <div className="lg:col-span-4 space-y-6">
-            
             <div className="bg-white border-t-4 border-red-600 shadow-xl overflow-hidden rounded-sm">
-              {/* SEKMELER */}
               <div className="flex bg-[#111] border-b border-white/10">
                 <button 
                   onClick={() => setAktifSekme('puan')}
@@ -190,7 +214,7 @@ export default function KategoriSayfasi() {
                           <td className="p-2 text-center font-black text-red-600 bg-red-50">{takim.points}</td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={4} className="p-10 text-center animate-pulse text-gray-400 font-black italic">VERİLER MÜHÜRLENİYOR...</td></tr>
+                        <tr><td colSpan={4} className="p-10 text-center animate-pulse text-gray-400 font-black italic">VERİLER YÜKLENİYOR...</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -200,13 +224,13 @@ export default function KategoriSayfasi() {
                       <div key={index} className="p-3 hover:bg-gray-50 transition-all border-l-4 border-transparent hover:border-red-600">
                         <p className="text-[8px] text-gray-400 font-black italic mb-1 uppercase">{mac.time || "SÜPER LİG"}</p>
                         <div className="flex justify-between items-center text-[10px] font-black italic text-gray-800 tracking-tighter">
-                          <span className={mac.home.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.home}</span>
+                          <span className={mac.home?.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.home}</span>
                           <span className="text-red-600 px-2">VS</span>
-                          <span className={mac.away.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.away}</span>
+                          <span className={mac.away?.includes('Kocaeli') ? 'text-green-600' : ''}>{mac.away}</span>
                         </div>
                       </div>
                     )) : (
-                      <div className="p-10 text-center text-gray-400 font-black italic uppercase">FİKSTÜR BEKLENİYOR...</div>
+                      <div className="p-10 text-center text-gray-400 font-black italic uppercase animate-pulse">FİKSTÜR BEKLENİYOR...</div>
                     )}
                   </div>
                 )}
@@ -214,7 +238,6 @@ export default function KategoriSayfasi() {
             </div>
           </div>
         )}
-
       </div>
 
       <style jsx global>{`

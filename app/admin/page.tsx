@@ -249,12 +249,24 @@ const haberKaydet = async (e: React.FormEvent) => {
               </div>
 
               {/* SEO AYARLARI */}
-              <div className="bg-white p-8 rounded-2xl border shadow-sm space-y-4 font-black italic uppercase">
-                <h4 className="text-xs border-b pb-2 flex items-center gap-2 text-blue-600"><FaIcons.FaSearch/> Google SEO</h4>
-                <input className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px]" placeholder="ANAHTAR KELİMELER" value={formData.anahtarKelimeler} onChange={(e)=>setFormData({...formData, anahtarKelimeler: e.target.value})} />
-                <textarea className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px] h-20" placeholder="META AÇIKLAMA" value={formData.metaAciklama} onChange={(e)=>setFormData({...formData, metaAciklama: e.target.value})} />
-              </div>
-            </div>
+          <div className="bg-white p-8 rounded-2xl border shadow-sm space-y-4 font-black italic uppercase">
+            <h4 className="text-xs border-b pb-2 flex items-center gap-2 text-blue-600"><FaIcons.FaSearch/> Google SEO</h4>
+            
+            <input 
+              className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px]" 
+              placeholder="ANAHTAR KELİMELER" 
+              value={formData.seo_kelimeler || ""} 
+              onChange={(e)=>setFormData({...formData, seo_kelimeler: e.target.value})} 
+            />
+
+            <textarea 
+              className="w-full p-3 bg-gray-50 border-none rounded-lg text-[10px] h-20" 
+              placeholder="META AÇIKLAMA" 
+              value={formData.meta_aciklama || ""} 
+              onChange={(e)=>setFormData({...formData, meta_aciklama: e.target.value})} 
+            />
+          </div> {/* KANKA: Bu div SEO kutusunu kapatıyor */}
+        </div> {/* KANKA: Bu div SOL KOLONU (lg:col-span-8) kapatıyor */}
 
             {/* SAĞ KOLON: AYARLAR VE KATEGORİLER */}
             <div className="lg:col-span-4 space-y-6 font-black italic uppercase">
