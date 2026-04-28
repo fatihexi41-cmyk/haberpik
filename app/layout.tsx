@@ -35,10 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   });
 
   const tumKategoriler = [
-    "Gündem", "Spor", "Siyaset", "Asayiş", "Ekonomi", "Türkiye Haberleri", 
-    "Dünya", "Bilim Teknoloji", "Kültür Sanat", "Eğitim", "Sağlık", 
-    "Emlak", "Otomobil", "Magazin", "Hayatın İçinden", "Video Galeri", "Foto Galeri"
-  ];
+  "GÜNDEM", "SİYASET", "SPOR", "EKONOMİ", "ASAYİŞ", "DÜNYA", 
+  "TÜRKİYE HABERLERİ", "BİLİM TEKNOLOJİ", "SAĞLIK", "EĞİTİM", "HAYATIN İÇİNDEN"
+];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -114,22 +113,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
 
         {/* YANDAN MENÜ */}
-        <div className={`fixed inset-y-0 right-0 z-[999] w-80 bg-[#111] shadow-2xl transform ${menuAcik ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out border-l border-red-600/30`}>
-          <div className="p-6 h-full flex flex-col">
-            <div className="flex justify-between items-center mb-10">
-              <span className="text-2xl font-black italic text-white uppercase tracking-tighter">
-                {siteAyarlari.logoUrl ? <img src={siteAyarlari.logoUrl} alt="logo" className="h-8 w-auto inline-block" /> : siteAyarlari.siteBasligi}
-              </span>
-              <button onClick={() => setMenuAcik(false)} className="text-white hover:text-red-600 transition-colors"><FaIcons.FaTimes size={24}/></button>
-            </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-10 flex flex-col gap-3">
-              {tumKategoriler.map(m => (
-                <Link key={m} href={`/kategori/${m.toLowerCase().replace(/, /g, '-').replace(/ /g, '-')}`} onClick={() => setMenuAcik(false)} className="text-gray-300 text-base font-bold italic uppercase hover:text-red-600 hover:translate-x-2 transition-all border-b border-white/5 pb-1">{m}</Link>
-              ))}
-            </div>
-          </div>
-        </div>
-        {menuAcik && <div onClick={() => setMenuAcik(false)} className="fixed inset-0 bg-black/60 z-[998] animate-in fade-in duration-300"></div>}
+<div className={`fixed inset-y-0 right-0 z-[999] w-80 bg-[#111] shadow-2xl transform ${menuAcik ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out border-l border-red-600/30`}>
+  <div className="p-6 h-full flex flex-col">
+    <div className="flex justify-between items-center mb-10">
+      <span className="text-2xl font-black italic text-white uppercase tracking-tighter">
+        {siteAyarlari.logoUrl ? <img src={siteAyarlari.logoUrl} alt="logo" className="h-8 w-auto inline-block" /> : siteAyarlari.siteBasligi}
+      </span>
+      <button onClick={() => setMenuAcik(false)} className="text-white hover:text-red-600 transition-colors"><FaIcons.FaTimes size={24}/></button>
+    </div>
+    <div className="flex-1 overflow-y-auto no-scrollbar pb-10 flex flex-col gap-3">
+      {tumKategoriler.map(m => (
+        <Link key={m} href={`/kategori/${m === "BİLİM TEKNOLOJİ" ? "teknoloji" : m === "TÜRKİYE HABERLERİ" ? "turkiye" : m === "HAYATIN İÇİNDEN" ? "yasam" : m === "SİYASET" ? "siyaset" : m === "EKONOMİ" ? "ekonomi" : m === "EĞİTİM" ? "egitim" : m.toLowerCase().replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/ /g, '-')}`} onClick={() => setMenuAcik(false)} className="text-gray-300 text-base font-bold italic uppercase hover:text-red-600 hover:translate-x-2 transition-all border-b border-white/5 pb-1">{m}</Link>
+      ))}
+    </div>
+  </div>
+</div>
+{menuAcik && <div onClick={() => setMenuAcik(false)} className="fixed inset-0 bg-black/60 z-[998] animate-in fade-in duration-300"></div>}
 
         {/* 1. ÜST HEADER */}
         <header className={`${isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-gray-300'} border-b py-1 z-[850] transition-colors`}>
@@ -209,15 +208,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center overflow-x-auto no-scrollbar">
               <Link href="/" className="px-3 py-3 bg-red-600 text-white"><FaIcons.FaHome size={18}/></Link>
               {["GÜNDEM", "SİYASET", "SPOR", "EKONOMİ", "ASAYİŞ", "DÜNYA", "TÜRKİYE HABERLERİ", "BİLİM TEKNOLOJİ"].map(m => {
-  // KANKA: Slug oluştururken karmaşık replace yerine sade bir mantık kuruyoruz
-  const safeSlug = m.toLowerCase()
-    .replace(/ğ/g, 'g')
-    .replace(/ü/g, 'u')
-    .replace(/ş/g, 's')
-    .replace(/ı/g, 'i')
-    .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c')
-    .replace(/ /g, '-');
+  const slugMapping: { [key: string]: string } = {
+    "GÜNDEM": "gundem", "SİYASET": "siyaset", "SPOR": "spor",
+    "EKONOMİ": "ekonomi", "ASAYİŞ": "asayis", "DÜNYA": "dunya",
+    "TÜRKİYE HABERLERİ": "turkiye", "BİLİM TEKNOLOJİ": "teknoloji"
+  };
+
+  const safeSlug = slugMapping[m] || m.toLowerCase().replace(/ /g, '-');
 
   return (
     <Link 
@@ -283,7 +280,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
                 
                 <p className="text-gray-500 font-bold italic text-sm mb-8 leading-relaxed uppercase tracking-tighter max-w-sm">
-                  {siteAyarlari.siteAciklamasi || siteAyarlari.footerMetin || "KOCAELİ'NİN DİNAMİK HABER MERKEZİ. GÜNCEL SİYASET, SPOR VE ASAYİŞ HABERLERİ."}
+                  {siteAyarlari.siteAciklamasi || siteAyarlari.footerMetin || "Gündeme Yön Veren Haberler. Kocaeli'nin Dinamikleri ve Türkiye'nin Gerçekleri Tek Bir Çatı Altında"}
                 </p>
 
                 <div className="flex gap-3">
@@ -304,8 +301,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <h4 className="text-red-600 font-black italic text-sm mb-2 uppercase">Kategoriler</h4>
                 <Link href="/kategori/gundem" className="text-gray-400 hover:text-white font-bold italic text-xs uppercase transition-colors">Gündem</Link>
                 <Link href="/kategori/spor" className="text-gray-400 hover:text-white font-bold italic text-xs uppercase transition-colors">Spor</Link>
-                <Link href="/kategori/foto-galeri" className="text-gray-400 hover:text-white font-bold italic text-xs uppercase transition-colors">Foto Galeri</Link>
-                <Link href="/kategori/video-galeri" className="text-gray-400 hover:text-white font-bold italic text-xs uppercase transition-colors">Video Galeri</Link>
               </div>
 
               <div className="md:col-span-3 flex flex-col gap-3">

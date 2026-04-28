@@ -29,17 +29,36 @@ export default function KategoriSayfasi() {
     if (!slugRaw) return;
     if (isMore) setDahaYukleniyor(true); else setYukleniyor(true);
 
-    const tumKategoriler = ["GÜNDEM", "SPOR", "SİYASET", "ASAYİŞ", "EKONOMİ", "TÜRKİYE HABERLERİ", "DÜNYA", "BİLİM TEKNOLOJİ", "KÜLTÜR SANAT", "EĞİTİM", "SAĞLIK", "EMLAK", "OTOMOBİL", "MAGAZİN", "HAYATIN İÇİNDEN", "VİDEO GALERİ", "FOTO GALERİ"];
+    // KANKA: Kategori Haritası - URL'den gelen ismi Firebase'deki tam karşılığına mühürler
+    const KATEGORI_HARITASI: { [key: string]: string } = {
+      "gundem": "GÜNDEM",
+      "spor": "SPOR",
+      "siyaset": "SİYASET",
+      "asayis": "ASAYİŞ",
+      "ekonomi": "EKONOMİ",
+      "turkiye": "TÜRKİYE HABERLERİ",
+      "dunya": "DÜNYA",
+      "teknoloji": "BİLİM TEKNOLOJİ",
+      "kultur-sanat": "KÜLTÜR SANAT",
+      "egitim": "EĞİTİM",
+      "saglik": "SAĞLIK",
+      "emlak": "EMLAK",
+      "otomobil": "OTOMOBİL",
+      "magazin": "MAGAZİN",
+      "yasam": "HAYATIN İÇİNDEN",
+      "hayatin-icinden": "HAYATIN İÇİNDEN",
+      "siyaset-kucuk": "siyaset", 
+      "ekonomi-kucuk": "ekonomi"
+    };
 
-    const slugUpper = tumKategoriler.find(k => 
-      k.toLowerCase().replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/ /g, '-') === slugRaw.toLowerCase()
-    ) || slugRaw.toUpperCase().replace(/-/g, ' ');
+    // Slug'ı haritadan bul, yoksa eski usul temizle (Emniyet kemeri)
+    const slugUpper = KATEGORI_HARITASI[slugRaw] || slugRaw.toUpperCase().replace(/-/g, ' ');
 
     let q = query(
       collection(db, "haberler"),
       where("kategoriler", "array-contains", slugUpper),
       orderBy("tarih", "desc"),
-      limit(12) // Kanka 12-12 çekmek daha şık durur
+      limit(12)
     );
 
     // EĞER DAHA FAZLA BUTONUNA BASILDIYSA:

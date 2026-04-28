@@ -87,6 +87,10 @@ haberler.filter(h => {
   const sliderHaberler = haberler.filter(h => h.sliderEkle).length > 0 ? haberler.filter(h => h.sliderEkle) : haberler.slice(0, 20);
   const sonDakikaHaberleri = haberler.filter(h => h.sonDakika);
   const trendHaberler = haberler.filter(h => h.trendEkle).slice(0, 6);
+  const sonDakikaSutun = haberler
+  .filter(h => h.sonDakika === true) // Botun mühürlediği damgaya bakıyoruz
+  .sort((a, b) => b.tarih - a.tarih) // En yeniyi en üste al
+  .slice(0, 8); // Tam 8 haber mühürü
   
   // HAYATIN İÇİNDEN
   const hayatinIcindenHaberler = getKat("HAYATIN İÇİNDEN", 12);
@@ -244,6 +248,34 @@ haberler.filter(h => {
   </div>
 </div>
 
+{/* SON DAKİKA - MİKRO DİKDÖRTGEN GRID (4 SÜTUN 2 SATIR) */}
+<div className="lg:col-span-4 bg-white p-1">
+  {/* BAŞLIK BANDI */}
+  <div className="bg-gray-100 p-2 mb-0.5 flex items-center justify-between border-l-4 border-red-600">
+      <h3 className="text-[10px] font-black italic uppercase text-gray-900">SON DAKİKA</h3>
+  </div>
+
+  {/* KANKA: Yan yana 4 haber (grid-cols-4), toplam 2 satır */}
+  <div className="grid grid-cols-4 gap-0.5">
+    {sonDakikaSutun.slice(0, 8).map((h) => (
+      <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-[5/3] group overflow-hidden bg-gray-900 border border-gray-100 shadow-sm">
+        <img 
+            src={h.resim} 
+            loading="lazy" 
+            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" 
+            alt="sd"
+        />
+        {/* KANKA: Kutu mikro olduğu için gölge ve yazıyı iyice minimize ettik */}
+        <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/90 to-transparent text-white">
+          <h4 className="text-[7px] font-bold uppercase leading-[1.1] line-clamp-2 tracking-tighter shadow-black">
+            {h.baslik}
+          </h4>
+        </div>
+      </Link>
+    ))}
+  </div>
+</div>
+
       {/* REKLAM ALANI 1 - KANKA: BURASI ARTIK CANLI SLAYT */}
 <div className="w-full bg-white h-24 border-y border-gray-300 relative overflow-hidden my-2">
   {siteAyarlari?.anaSayfaReklamlar && siteAyarlari.anaSayfaReklamlar.length > 0 ? (
@@ -288,26 +320,29 @@ haberler.filter(h => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-1 p-1 bg-gray-300">
             {/* SOL: SLIDER (KOCAELİ + GENEL) */}
             <div className="lg:col-span-7 bg-white relative h-[480px] group overflow-hidden">
-                <div className="absolute inset-0 flex transition-transform duration-500 ease-in-out" 
-                     style={{ transform: `translateX(-${sliderIndex * 100}%)` }}>
-                  {sporSliderData.map((h, i) => (
-                    <div key={h.id} className="min-w-full h-full relative">
-                       <img src={h.resim} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent flex flex-col justify-end p-8">
-                          <div className="flex gap-2 mb-3">
-                            <span className="bg-green-600 text-white text-[10px] font-black px-2 py-1 italic uppercase">SPORPİK GÜNCEL</span>
-                            <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 italic uppercase">{i + 1} / 10</span>
-                          </div>
-                          <h4 className="text-white text-2xl md:text-4xl font-black uppercase italic leading-none tracking-tighter mb-2 group-hover:text-green-400 transition-colors drop-shadow-xl line-clamp-2">
-                            {h.baslik}
-                          </h4>
-                       </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setSliderIndex(sliderIndex === 0 ? 9 : sliderIndex - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-green-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"><FaIcons.FaChevronLeft size={24}/></button>
-                <button onClick={() => setSliderIndex(sliderIndex === 9 ? 0 : sliderIndex + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-green-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"><FaIcons.FaChevronRight size={24}/></button>
-            </div>
+    <div className="absolute inset-0 flex transition-transform duration-500 ease-in-out" 
+         style={{ transform: `translateX(-${sliderIndex * 100}%)` }}>
+      {/* KANKA: sporSliderData'yı 30 haberle sınırlıyoruz */}
+      {sporSliderData.slice(0, 30).map((h, i) => (
+        <div key={h.id} className="min-w-full h-full relative">
+           <img src={h.resim} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent flex flex-col justify-end p-8">
+              <div className="flex gap-2 mb-3">
+                <span className="bg-green-600 text-white text-[10px] font-black px-2 py-1 italic uppercase">SPORPİK GÜNCEL</span>
+                {/* KANKA: Sayacı 30'a göre güncelledik */}
+                <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 italic uppercase">{i + 1} / 30</span>
+              </div>
+              <h4 className="text-white text-2xl md:text-4xl font-black uppercase italic leading-none tracking-tighter mb-2 group-hover:text-green-400 transition-colors drop-shadow-xl line-clamp-2">
+                {h.baslik}
+              </h4>
+           </div>
+        </div>
+      ))}
+    </div>
+    {/* KANKA: Buton limitlerini 29 (yani 30. haber) olarak güncelledim */}
+    <button onClick={() => setSliderIndex(sliderIndex === 0 ? 29 : sliderIndex - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-green-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"><FaIcons.FaChevronLeft size={24}/></button>
+    <button onClick={() => setSliderIndex(sliderIndex === 29 ? 0 : sliderIndex + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-green-600 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all z-20"><FaIcons.FaChevronRight size={24}/></button>
+</div>
 
             {/* SAĞ: SEKMELİ PUAN & FİKSTÜR */}
             <div className="lg:col-span-5 bg-white flex flex-col h-[480px]">
@@ -410,19 +445,41 @@ haberler.filter(h => {
           </div>
       </section>
       {/* 5. GÜNDEM */}
-      <section className="bg-white p-1">
-          <div className="bg-gray-900 text-white p-2 mb-0.5 font-black italic uppercase tracking-widest text-[14px] border-r-8 border-red-600">GÜNDEM ÖZETİ</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-              {getKat("GÜNDEM", 16).map(h => (
+<section className="bg-white p-1">
+    <div className="bg-gray-900 text-white p-2 mb-0.5 font-black italic uppercase tracking-widest text-[14px] border-r-8 border-red-600 flex justify-between items-center">
+        <span>KOCAELİ GÜNDEM ÖZETİ</span>
+        <Link href="/kategori/gundem" className="bg-red-600 text-white text-[10px] px-3 py-1 not-italic tracking-normal hover:bg-white hover:text-red-600 transition-colors duration-300">
+            TÜMÜNÜ GÖR
+        </Link>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
+        {/* KANKA: getKat yerine doğrudan haberler dizisini filtreleyerek 16 tane çekiyoruz */}
+        {haberler && haberler
+            .filter(h => 
+                h.kategoriler?.includes("GÜNDEM") || 
+                h.kategoriler?.includes("ASAYİŞ") || 
+                h.kategoriler?.includes("SİYASET") ||
+                h.kategoriler?.includes("KOCAELİ GÜNDEMİ")
+            )
+            .slice(0, 16) // Tam 16 haber mühürü
+            .map(h => (
                 <Link href={`/haber/${h.id}`} key={h.id} className="relative group aspect-[4/3] overflow-hidden">
-                   <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
-                   <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-3">
-                       <h4 className="text-white text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">{h.baslik}</h4>
-                   </div>
+                    <img 
+                        src={h.resim} 
+                        loading="lazy" 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" 
+                        alt={h.baslik}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-3">
+                        <h4 className="text-white text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">
+                            {h.baslik}
+                        </h4>
+                    </div>
                 </Link>
-              ))}
-          </div>
-      </section>
+            ))
+        }
+    </div>
+</section>
 
       {/* 6. GAZETELER - KANKA: PREMİUM VE HATASIZ VERSİYON */}
 <section className="bg-[#0a0a0a] py-8 px-4 shadow-2xl relative overflow-hidden">
@@ -524,46 +581,76 @@ haberler.filter(h => {
   )}
 </section>
 
-      {/* 7. EKONOMİPİK - KANKA: BURASI GERİ GELDİ */}
-      <section className="bg-white p-1 border-t-4 border-blue-900 shadow-lg">
-          <div className="flex justify-between items-center mb-1 bg-blue-900 p-2 text-white italic font-black text-sm uppercase">
-              <div className="flex items-center gap-2"><FaIcons.FaChartLine/> EKONOMİPİK</div>
-              <Link href="/kategori/ekonomi" className="text-[10px]">TÜMÜ</Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-              {getKat("EKONOMİ", 12).map(h => (
-                 <Link href={`/haber/${h.id}`} key={h.id} className="relative h-32 group overflow-hidden border border-gray-100">
+      {/* 7. EKONOMİPİK - KANKA: HARF DUYARSIZ MİNOR DOKUNUŞ YAPILDI */}
+<section className="bg-white p-1 border-t-4 border-blue-900 shadow-lg">
+    <div className="flex justify-between items-center mb-1 bg-blue-900 p-2 text-white italic font-black text-sm uppercase">
+        <div className="flex items-center gap-2"><FaIcons.FaChartLine/> EKONOMİPİK</div>
+        <Link href="/kategori/ekonomi" className="bg-white text-blue-900 text-[10px] px-3 py-1 not-italic tracking-normal hover:bg-red-600 hover:text-white transition-colors duration-300">
+            TÜMÜNÜ GÖR
+        </Link>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
+        {/* KANKA: Sadece filter ekledik, getKat'ın harf hatasını burada süzüyoruz */}
+        {haberler && haberler
+            .filter(h => h.kategoriler?.some(kat => kat.toUpperCase() === "EKONOMİ"))
+            .slice(0, 12)
+            .map(h => (
+                <Link href={`/haber/${h.id}`} key={h.id} className="relative h-32 group overflow-hidden border border-gray-100">
                     <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                     <div className="absolute inset-0 bg-black/50 flex items-end p-2">
-                       <h4 className="text-white text-[10px] font-black uppercase italic line-clamp-2">{h.baslik}</h4>
+                        <h4 className="text-white text-[10px] font-black uppercase italic line-clamp-2">{h.baslik}</h4>
                     </div>
-                 </Link>
-              ))}
-          </div>
-      </section>
+                </Link>
+            ))
+        }
+    </div>
+</section>
 
-      {/* 8. DEV TAB SLIDER - KANKA: BURASI DA TAMAM */}
-      <section className="bg-white shadow-2xl overflow-hidden border-y border-gray-300">
-          <div className="flex bg-[#111] overflow-x-auto no-scrollbar gap-0.5">
-             {['TÜRKİYE HABERLERİ', 'DÜNYA', 'SİYASET', 'ASAYİŞ'].map(tab => (
-                <button key={tab} onClick={() => setActiveKatTab(tab)} className={`flex-1 py-4 px-6 text-[13px] font-black italic uppercase transition-all ${activeKatTab === tab ? 'bg-red-600 text-white' : 'text-gray-400'}`}>{tab}</button>
-             ))}
-          </div>
-          <div className="h-[450px] relative">
-             <Swiper key={activeKatTab} modules={[Autoplay, Pagination, Navigation]} autoplay={{ delay: 6000 }} pagination={{ clickable: true }} navigation className="h-full">
-                {getKat(activeKatTab, 12).map(h => (
-                   <SwiperSlide key={h.id}>
-                      <Link href={`/haber/${h.id}`} className="relative block h-full group overflow-hidden">
-                         <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[12s]" />
-                         <div className="absolute inset-0 bg-gradient-to-t from-[#111] flex flex-col justify-end p-10">
-                            <h4 className="text-white text-3xl md:text-5xl font-black uppercase italic leading-none tracking-tighter">{h.baslik}</h4>
-                         </div>
-                      </Link>
-                   </SwiperSlide>
-                ))}
-             </Swiper>
-          </div>
-      </section>
+      {/* 8. DEV TAB SLIDER - KANKA: SAĞLIK VE EĞİTİM EKLENDİ, OTO-KAYMA AKTİF */}
+<section className="bg-white shadow-2xl overflow-hidden border-y border-gray-300">
+    <div className="flex bg-[#111] overflow-x-auto no-scrollbar gap-0.5">
+        {/* KANKA: Buradaki listeyi Sağlık ve Eğitim olarak güncelledik */}
+        {['TÜRKİYE HABERLERİ', 'DÜNYA', 'SAĞLIK', 'EĞİTİM'].map(tab => (
+            <button 
+                key={tab} 
+                onClick={() => setActiveKatTab(tab)} 
+                className={`flex-1 py-4 px-6 text-[13px] font-black italic uppercase transition-all ${activeKatTab === tab ? 'bg-red-600 text-white' : 'text-gray-400'}`}
+            >
+                {tab}
+            </button>
+        ))}
+    </div>
+    <div className="h-[450px] relative">
+        <Swiper 
+            key={activeKatTab} 
+            modules={[Autoplay, Pagination, Navigation]} 
+            autoplay={{ 
+                delay: 5000, // Kanka 5 saniyede bir kendi kayar
+                disableOnInteraction: false, // Kullanıcı tıklasa bile durmaz, devam eder
+            }} 
+            pagination={{ clickable: true }} 
+            navigation 
+            className="h-full"
+        >
+            {getKat(activeKatTab, 12).map(h => (
+                <SwiperSlide key={h.id}>
+                    <Link href={`/haber/${h.id}`} className="relative block h-full group overflow-hidden">
+                        <img 
+                            src={h.resim} 
+                            loading="lazy" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[12s]" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#111] flex flex-col justify-end p-10">
+                            <h4 className="text-white text-3xl md:text-5xl font-black uppercase italic leading-none tracking-tighter">
+                                {h.baslik}
+                            </h4>
+                        </div>
+                    </Link>
+                </SwiperSlide>
+            ))}
+        </Swiper>
+    </div>
+</section>
 
       {/* 9. VİDEOPİK */}
       <section className="bg-red-600 p-3 shadow-2xl relative">
@@ -581,22 +668,25 @@ haberler.filter(h => {
       </section>
 
       {/* 10. HAYATIN İÇİNDEN - KANKA: SON PARÇA DA EKLENDİ */}
-      <section className="bg-white p-1 shadow-inner">
-        <div className="bg-gray-100 p-3 mb-1 flex items-center justify-between">
-            <h3 className="text-lg font-black italic uppercase">HAYATIN İÇİNDEN</h3>
-            <Link href="/kategori/hayatın-içinden" className="text-[10px] text-red-600 font-black border-b border-red-600">TÜMÜ</Link>
+<section className="bg-white p-1 shadow-inner">
+  <div className="bg-gray-100 p-3 mb-1 flex items-center justify-between border-l-4 border-red-600">
+      <h3 className="text-lg font-black italic uppercase text-gray-900">HAYATIN İÇİNDEN</h3>
+      {/* KANKA: Linki 'yasam' veya 'hayat' gibi daha standart bir şeye yönlendirmeni öneririm */}
+      <Link href="/kategori/yasam" className="bg-red-600 text-white text-[10px] px-3 py-1 not-italic font-bold tracking-normal hover:bg-gray-900 transition-colors duration-300">
+          TÜMÜNÜ GÖR
+      </Link>
+  </div>
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
+    {hayatinIcindenHaberler.map((h) => (
+      <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-video group overflow-hidden bg-gray-900">
+        <img src={h.resim} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 text-white">
+          <h4 className="text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">{h.baslik}</h4>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-          {hayatinIcindenHaberler.map((h) => (
-            <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-video group overflow-hidden bg-gray-900">
-              <img src={h.resim} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black flex flex-col justify-end p-3 text-white">
-                <h4 className="text-[11px] font-black uppercase italic line-clamp-2">{h.baslik}</h4>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      </Link>
+    ))}
+  </div>
+</section>
 
       {/* 5. VİZYONDAKİ FİLMLER - SİNEMA AMBİYANSI */}
       <section className="bg-[#111] py-10 mt-6 shadow-inner">
