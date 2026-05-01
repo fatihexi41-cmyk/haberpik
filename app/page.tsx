@@ -34,7 +34,7 @@ export default function Home() {
   const [kurVerileri, setKurVerileri] = useState<any>(null);
 
   useEffect(() => {
-    const qHaber = query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(50));
+    const qHaber = query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(300));
     const unsubscribeHaber = onSnapshot(qHaber, (snapshot) => {
       setHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setYukleniyor(false);
@@ -87,10 +87,10 @@ haberler.filter(h => {
   const sliderHaberler = haberler.filter(h => h.sliderEkle).length > 0 ? haberler.filter(h => h.sliderEkle) : haberler.slice(0, 20);
   const sonDakikaHaberleri = haberler.filter(h => h.sonDakika);
   const trendHaberler = haberler.filter(h => h.trendEkle).slice(0, 6);
-  const sonDakikaSutun = haberler
-  .filter(h => h.sonDakika === true) // Botun mühürlediği damgaya bakıyoruz
-  .sort((a, b) => b.tarih - a.tarih) // En yeniyi en üste al
-  .slice(0, 8); // Tam 8 haber mühürü
+  const mansetSutun = haberler
+  .filter(h => h.mansetEkle === true) // Sadece Manşet damgasına bak diyoruz
+  .sort((a, b) => b.tarih - a.tarih) // En taze manşeti başa al
+  .slice(0, 8); // Tam 8 kutuluk yerimiz var
   
   // HAYATIN İÇİNDEN
   const hayatinIcindenHaberler = getKat("HAYATIN İÇİNDEN", 12);
@@ -248,26 +248,27 @@ haberler.filter(h => {
   </div>
 </div>
 
-{/* SON DAKİKA - MİKRO DİKDÖRTGEN GRID (4 SÜTUN 2 SATIR) */}
+{/* MANŞET REYONU - MİKRO DİKDÖRTGEN GRID (4 SÜTUN 2 SATIR) */}
 <div className="lg:col-span-4 bg-white p-1">
-  {/* BAŞLIK BANDI */}
+  {/* BAŞLIK BANDI - İsim Manşet Olarak Güncellendi */}
   <div className="bg-gray-100 p-2 mb-0.5 flex items-center justify-between border-l-4 border-red-600">
-      <h3 className="text-[10px] font-black italic uppercase text-gray-900">SON DAKİKA</h3>
+      <h3 className="text-[10px] font-black italic uppercase text-gray-900">GÜNÜN MANŞETLERİ</h3>
   </div>
 
-  {/* KANKA: Yan yana 4 haber (grid-cols-4), toplam 2 satır */}
+  {/* KANKA: Değişken adını mansetSutun yapmayı unutma, yukarıda tanımlamıştık */}
   <div className="grid grid-cols-4 gap-0.5">
-    {sonDakikaSutun.slice(0, 8).map((h) => (
+    {mansetSutun.map((h) => (
       <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-[5/3] group overflow-hidden bg-gray-900 border border-gray-100 shadow-sm">
         <img 
             src={h.resim} 
             loading="lazy" 
             className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" 
-            alt="sd"
+            alt="manset"
         />
-        {/* KANKA: Kutu mikro olduğu için gölge ve yazıyı iyice minimize ettik */}
-        <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/90 to-transparent text-white">
-          <h4 className="text-[7px] font-bold uppercase leading-[1.1] line-clamp-2 tracking-tighter shadow-black">
+        {/* KANKA: Arka plan gölgesini biraz daha koyulaştırdım ki beyaz yazılar patlasın */}
+        <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black via-black/70 to-transparent text-white">
+          {/* PUNTO AYARI: text-[7px]'den text-[9px]'e çıkardım, font-black yaparak iyice belirginleştirdim */}
+          <h4 className="text-[9px] font-black uppercase leading-tight line-clamp-2 tracking-tighter drop-shadow-md">
             {h.baslik}
           </h4>
         </div>
@@ -453,15 +454,21 @@ haberler.filter(h => {
         </Link>
     </div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-        {/* KANKA: getKat yerine doğrudan haberler dizisini filtreleyerek 16 tane çekiyoruz */}
+        {/* KANKA: Ortak havuz dokunuşu yapıldı, yapı bozulmadı */}
         {haberler && haberler
-            .filter(h => 
-                h.kategoriler?.includes("GÜNDEM") || 
-                h.kategoriler?.includes("ASAYİŞ") || 
-                h.kategoriler?.includes("SİYASET") ||
-                h.kategoriler?.includes("KOCAELİ GÜNDEMİ")
-            )
-            .slice(0, 16) // Tam 16 haber mühürü
+            .filter(h => {
+                // Haberin kategorilerini dizi yapıp temizliyoruz ki botun ID hatası patlamasın
+                const katlar = Array.isArray(h.kategoriler) 
+                    ? h.kategoriler.map((k: any) => k.toUpperCase().trim()) 
+                    : [(h.kategori || "").toUpperCase().trim()];
+
+                // Siyaset, Asayiş veya Gündem etiketlerinden biri varsa vitrine girer
+                return katlar.includes("GÜNDEM") || 
+                       katlar.includes("ASAYİŞ") || 
+                       katlar.includes("SİYASET") ||
+                       katlar.includes("KOCAELİ GÜNDEMİ");
+            })
+            .slice(0, 16) // En taze 16 haber
             .map(h => (
                 <Link href={`/haber/${h.id}`} key={h.id} className="relative group aspect-[4/3] overflow-hidden">
                     <img 
@@ -581,7 +588,7 @@ haberler.filter(h => {
   )}
 </section>
 
-      {/* 7. EKONOMİPİK - KANKA: HARF DUYARSIZ MİNOR DOKUNUŞ YAPILDI */}
+      {/* 7. EKONOMİPİK - KANKA: OTOMATİK EKONOMİ SEPETİ BAĞLANDI */}
 <section className="bg-white p-1 border-t-4 border-blue-900 shadow-lg">
     <div className="flex justify-between items-center mb-1 bg-blue-900 p-2 text-white italic font-black text-sm uppercase">
         <div className="flex items-center gap-2"><FaIcons.FaChartLine/> EKONOMİPİK</div>
@@ -590,14 +597,20 @@ haberler.filter(h => {
         </Link>
     </div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-        {/* KANKA: Sadece filter ekledik, getKat'ın harf hatasını burada süzüyoruz */}
+        {/* KANKA: Sadece Ekonomi kategorisindeki en taze haberler burada akar */}
         {haberler && haberler
-            .filter(h => h.kategoriler?.some(kat => kat.toUpperCase() === "EKONOMİ"))
+            .filter(h => {
+                const katlar = Array.isArray(h.kategoriler) 
+                    ? h.kategoriler.map((k: any) => k.toUpperCase().trim()) 
+                    : [(h.kategori || "").toUpperCase().trim()];
+
+                return katlar.includes("EKONOMİ");
+            })
             .slice(0, 12)
             .map(h => (
                 <Link href={`/haber/${h.id}`} key={h.id} className="relative h-32 group overflow-hidden border border-gray-100">
-                    <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-black/50 flex items-end p-2">
+                    <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={h.baslik} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-2">
                         <h4 className="text-white text-[10px] font-black uppercase italic line-clamp-2">{h.baslik}</h4>
                     </div>
                 </Link>
@@ -606,10 +619,10 @@ haberler.filter(h => {
     </div>
 </section>
 
-      {/* 8. DEV TAB SLIDER - KANKA: SAĞLIK VE EĞİTİM EKLENDİ, OTO-KAYMA AKTİF */}
+      {/* 8. DEV TAB SLIDER - KANKA: 4 KATEGORİ ÖZEL FİLTRE BAĞLANDI */}
 <section className="bg-white shadow-2xl overflow-hidden border-y border-gray-300">
     <div className="flex bg-[#111] overflow-x-auto no-scrollbar gap-0.5">
-        {/* KANKA: Buradaki listeyi Sağlık ve Eğitim olarak güncelledik */}
+        {/* KANKA: Sekme isimlerini mühürledik */}
         {['TÜRKİYE HABERLERİ', 'DÜNYA', 'SAĞLIK', 'EĞİTİM'].map(tab => (
             <button 
                 key={tab} 
@@ -625,14 +638,15 @@ haberler.filter(h => {
             key={activeKatTab} 
             modules={[Autoplay, Pagination, Navigation]} 
             autoplay={{ 
-                delay: 5000, // Kanka 5 saniyede bir kendi kayar
-                disableOnInteraction: false, // Kullanıcı tıklasa bile durmaz, devam eder
+                delay: 5000, 
+                disableOnInteraction: false, 
             }} 
             pagination={{ clickable: true }} 
             navigation 
             className="h-full"
         >
-            {getKat(activeKatTab, 12).map(h => (
+            {/* KANKA: getKat kullanarak her kategori sepetinden en taze 15 taneyi çekiyoruz */}
+            {getKat(activeKatTab, 15).map(h => (
                 <SwiperSlide key={h.id}>
                     <Link href={`/haber/${h.id}`} className="relative block h-full group overflow-hidden">
                         <img 
@@ -667,24 +681,35 @@ haberler.filter(h => {
         </Swiper>
       </section>
 
-      {/* 10. HAYATIN İÇİNDEN - KANKA: SON PARÇA DA EKLENDİ */}
+      {/* 10. HAYATIN İÇİNDEN - KANKA: OTOMATİK YAŞAM SEPETİ BAĞLANDI */}
 <section className="bg-white p-1 shadow-inner">
   <div className="bg-gray-100 p-3 mb-1 flex items-center justify-between border-l-4 border-red-600">
       <h3 className="text-lg font-black italic uppercase text-gray-900">HAYATIN İÇİNDEN</h3>
-      {/* KANKA: Linki 'yasam' veya 'hayat' gibi daha standart bir şeye yönlendirmeni öneririm */}
-      <Link href="/kategori/yasam" className="bg-red-600 text-white text-[10px] px-3 py-1 not-italic font-bold tracking-normal hover:bg-gray-900 transition-colors duration-300">
+      <Link href="/kategori/hayatin-icinden" className="bg-red-600 text-white text-[10px] px-3 py-1 not-italic font-bold tracking-normal hover:bg-gray-900 transition-colors duration-300">
           TÜMÜNÜ GÖR
       </Link>
   </div>
   <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-    {hayatinIcindenHaberler.map((h) => (
-      <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-video group overflow-hidden bg-gray-900">
-        <img src={h.resim} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 text-white">
-          <h4 className="text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">{h.baslik}</h4>
-        </div>
-      </Link>
-    ))}
+    {/* KANKA: Sadece Hayatın İçinden kategorisindeki en taze 12 haber burada akar */}
+    {haberler && haberler
+        .filter(h => {
+            const katlar = Array.isArray(h.kategoriler) 
+                ? h.kategoriler.map((k: any) => k.toUpperCase().trim()) 
+                : [(h.kategori || "").toUpperCase().trim()];
+
+            // Kanka: Hem 'HAYATIN İÇİNDEN' hem de 'YAŞAM' etiketlerini ortak havuz yapıyoruz
+            return katlar.includes("HAYATIN İÇİNDEN") || katlar.includes("YAŞAM");
+        })
+        .slice(0, 12)
+        .map((h) => (
+          <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-video group overflow-hidden bg-gray-900">
+            <img src={h.resim} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity duration-300" alt={h.baslik} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 text-white">
+              <h4 className="text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">{h.baslik}</h4>
+            </div>
+          </Link>
+        ))
+    }
   </div>
 </section>
 

@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db, auth, storage } from "@/lib/firebase"; 
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";import { onAuthStateChanged, signOut } from "firebase/auth";
 import * as FaIcons from 'react-icons/fa';
 import { Line } from 'react-chartjs-2'; 
 import 'chart.js/auto';
@@ -141,10 +140,12 @@ const haberKaydet = async (e: React.FormEvent) => {
     const mühürlüVeri = { 
   ...formData, 
   // KANKA: Hem dizi hem tekil alanı BÜYÜK HARF yapıyoruz
-  kategoriler: formData.kategoriler.map((k: string) => k.toUpperCase().trim()),
-  kategori: formData.kategoriler?.[0]?.toUpperCase().trim() || 'GÜNDEM', 
+  kategoriler: Array.isArray(formData.kategoriler) && formData.kategoriler.length > 0 
+        ? formData.kategoriler.map((k: string) => k.toUpperCase().trim()) 
+        : [formData.kategori.toUpperCase().trim()],
+    kategori: formData.kategoriler?.[0]?.toUpperCase().trim() || formData.kategori.toUpperCase().trim(),
   kategori_slug: slugOlustur(formData.kategoriler?.[0] || 'gundem'),
-  manset: formData.mansetEkle || false, 
+  mansetEkle: formData.mansetEkle || false, 
   slider: formData.sliderEkle || false,
   guncellemeTarihi: new Date() 
 };
@@ -175,13 +176,70 @@ const haberKaydet = async (e: React.FormEvent) => {
   }; // İŞTE O MEŞHUR PARANTEZ BURADA KAPANMALI!
 
   const gazeteKaydet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    await addDoc(collection(db, "mansetler"), { ...gazeteForm, tarih: new Date() });
+  e.preventDefault();
+  setLoading(true);
+  try {
+    // 1. ADIM: Zaten yaptığın kısım, dolabı (hizmetler) okuyoruz
+    const docRef = doc(db, "ayarlar", "hizmetler");
+    const docSnap = await getDoc(docRef);
+    
+    let guncelListe = [];
+    if (docSnap.exists()) {
+      guncelListe = docSnap.data().gazeteMansetleri || [];
+    }
+
+    // 2. ADIM: İŞTE BURAYI BÖYLE DEĞİŞTİRİYORUZ (Mühürleme Kısmı)
+    // Kanka ana sayfan 'ad' ve 'img' bekliyor, o yüzden isimleri böyle mühürledik
+    const yeniGazete = {
+      ad: gazeteForm.ad,    // Admin panelindeki inputtan gelen isim
+      img: gazeteForm.resim, // Admin panelindeki inputtan gelen resim URL'si
+      tarih: new Date().toISOString() // Ne zaman eklendiğini bilelim
+    };
+
+    // 3. ADIM: Yeni gazeteyi mevcut listenin EN BAŞINA ekle kanka
+    const yeniListe = [yeniGazete, ...guncelListe];
+
+    // 4. ADIM: Şimdi tüm paketi Firebase'e geri gönderiyoruz
+    await updateDoc(docRef, {
+      gazeteMansetleri: yeniListe
+    });
+
+    // Formu temizle ve müjdeyi ver
     setGazeteForm({ ad: '', resim: '' });
+    alert("Gazete Manşeti Botun Dolabına Mühürlendi! 📰🚀");
+    
+  } catch (err) {
+    console.error("Mühürleme Hatası:", err);
+    alert("Hata oluştu kanka: " + err.message);
+  } finally {
     setLoading(false);
-    alert("Manşet Mühürlendi! 📰");
-  };
+  }
+};
+
+// KANKA: Bu kodu fonksiyonların olduğu bölüme ekle
+const gazeteSilManual = async (index: number) => {
+  if (confirm("Bu manşeti listeden atalım mı kanka? 🗑️")) {
+    setLoading(true);
+    try {
+      const docRef = doc(db, "ayarlar", "hizmetler");
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const liste = docSnap.data().gazeteMansetleri || [];
+        // Seçtiğin index'teki gazeteyi listeden ayıklıyoruz
+        const yeniListe = liste.filter((_: any, i: number) => i !== index);
+        
+        // Dolabı güncel haliyle geri mühürlüyoruz
+        await updateDoc(docRef, { gazeteMansetleri: yeniListe });
+        alert("Manşet listeden imha edildi! 🔥");
+      }
+    } catch (err) {
+      alert("Silme hatası kanka!");
+    } finally {
+      setLoading(false);
+    }
+  }
+};
 
   const dikeyVideoKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,12 +288,31 @@ const haberKaydet = async (e: React.FormEvent) => {
 
       <main className="flex-1 p-10 overflow-y-auto h-screen bg-gray-50">
         {tab === 'dashboard' && (
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Toplam Haber</p><h3 className="text-3xl font-black italic">{stats.toplamHaber}</h3></div>
-              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Toplam Okunma</p><h3 className="text-3xl font-black italic text-red-600">{stats.toplamOkunma}</h3></div>
-              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Dikey Video</p><h3 className="text-3xl font-black italic text-purple-600">{dikeyVideolar.length}</h3></div>
-              <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Gazeteler</p><h3 className="text-3xl font-black italic text-green-600">{mansetler.length}</h3></div>
-           </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Toplam Haber</p><h3 className="text-3xl font-black italic">{stats.toplamHaber}</h3></div>
+            <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Toplam Okunma</p><h3 className="text-3xl font-black italic text-red-600">{stats.toplamOkunma}</h3></div>
+            <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Dikey Video</p><h3 className="text-3xl font-black italic text-purple-600">{dikeyVideolar.length}</h3></div>
+            <div className="bg-white p-6 rounded-2xl border shadow-sm"><p className="text-gray-400 text-[10px] font-black mb-1">Gazeteler</p><h3 className="text-3xl font-black italic text-green-600">{gazeteler.length}</h3></div>
+          </div>
+        )}
+
+        {tab === 'gazete-mansetleri' && (
+          <div className="space-y-8">
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {gazeteler.map((m: any, index: number) => (
+                <div key={index} className="bg-white p-4 rounded-2xl border relative group">
+                  <img src={m.img} className="w-full aspect-[3/4] object-cover rounded-xl" />
+                  <div className="mt-2 text-[10px] font-black italic">{m.ad}</div>
+                  <button 
+                    onClick={() => gazeteSilManual(index)} 
+                    className="absolute top-6 right-6 bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <FaIcons.FaTrashAlt/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {tab === 'haber-ekle' && (
@@ -432,12 +509,25 @@ const haberKaydet = async (e: React.FormEvent) => {
                  </form>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                 {mansetler.map((m) => (
-                   <div key={m.id} className="bg-white p-4 rounded-2xl border relative group">
-                      <img src={m.resim} className="w-full aspect-[3/4] object-cover rounded-xl" />
-                      <button onClick={async () => await deleteDoc(doc(db, "mansetler", m.id))} className="absolute top-6 right-6 bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><FaIcons.FaTrashAlt/></button>
-                   </div>
-                 ))}
+                 {/* KANKA: Gazeteler sekmesindeki listeleme burası olmalı */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+  {haberler
+    .filter(h => h.kategori === "GAZETE MANŞETLERİ") // Sadece gazeteleri süz
+    .map((m) => (
+      <div key={m.id} className="bg-white p-4 rounded-2xl border relative group">
+        <img src={m.resim} className="w-full aspect-[3/4] object-cover rounded-xl" />
+        <div className="mt-2 text-[10px] font-black">{m.baslik}</div>
+        <button 
+          onClick={async () => {
+            if(confirm("Silelim mi kanka?")) await deleteDoc(doc(db, "haberler", m.id));
+          }} 
+          className="absolute top-6 right-6 bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+        >
+          <FaIcons.FaTrashAlt/>
+        </button>
+      </div>
+  ))}
+</div>
               </div>
            </div>
         )}
