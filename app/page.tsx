@@ -33,83 +33,96 @@ export default function Home() {
   const [seciliGazete, setSeciliGazete] = useState<any>(null);
   const [kurVerileri, setKurVerileri] = useState<any>(null);
 
-  useEffect(() => {
-    const qHaber = query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(300));
-    const unsubscribeHaber = onSnapshot(qHaber, (snapshot) => {
-      setHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setYukleniyor(false);
+  // KANKA: ÖNCE VİTRİNLER İÇİN YENİ STATE'LERİ EKLEYELİM (Bunları Home fonksiyonunun en üstüne, diğer state'lerin yanına ekle)
+  const [mansetHaberler, setMansetHaberler] = useState<any[]>([]);
+  const [sonDakikaHaberleri, setSonDakikaHaberleri] = useState<any[]>([]);
+  const [trendHaberler, setTrendHaberler] = useState<any[]>([]);
+  const [yerelSporHaberler, setYerelSporHaberler] = useState<any[]>([]);
+  const [hayatinIcindenHaberler, setHayatinIcindenHaberler] = useState<any[]>([]);
+  const [sporSliderHaberler, setSporSliderHaberler] = useState<any[]>([]);
+  const [mansetGridHaberler, setMansetGridHaberler] = useState<any[]>([]);
+
+  useEffect(() => {
+    // 1. ANA SLIDER SORGUSU (Bağımsız - Sadece Slider Ekle seçilenler veya en son 20 haber)
+    const qSlider = query(collection(db, "haberler"), orderBy("tarih", "desc"), limit(20));
+    const unsubscribeSlider = onSnapshot(qSlider, (snapshot) => {
+      setMansetHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setYukleniyor(false);
+    });
+
+    // 2. SON DAKİKA SORGUSU (Bağımsız - Sadece Son Dakika olan en güncel 10 haber)
+    const qSonDakika = query(collection(db, "haberler"), where("sonDakika", "==", true), orderBy("tarih", "desc"), limit(10));
+    const unsubscribeSonDakika = onSnapshot(qSonDakika, (snapshot) => {
+      setSonDakikaHaberleri(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const qDikey = query(collection(db, "dikey_videolar"), orderBy("tarih", "desc"), limit(20));
-    const unsubscribeDikey = onSnapshot(qDikey, (snapshot) => {
-      setDikeyVideolar(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // 3. ÖNE ÇIKANLAR / TREND SORGUSU (Bağımsız - Trend Ekle seçilen son 6 haber)
+    const qTrend = query(collection(db, "haberler"), where("trendEkle", "==", true), orderBy("tarih", "desc"), limit(6));
+    const unsubscribeTrend = onSnapshot(qTrend, (snapshot) => {
+      setTrendHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    getDoc(doc(db, "ayarlar", "genel")).then(docSnap => {
-      if (docSnap.exists()) setSiteAyarlari(docSnap.data());
+    // 4. MANŞET GRID (8'Lİ KUTU) SORGUSU (Bağımsız - Manset Ekle seçilen son 8 haber)
+    const qMansetGrid = query(collection(db, "haberler"), where("mansetEkle", "==", true), orderBy("tarih", "desc"), limit(8));
+    const unsubscribeMansetGrid = onSnapshot(qMansetGrid, (snapshot) => {
+      setMansetGridHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubHizmetler = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        
-        // KANKA: İŞTE SİHİRLİ DOKUNUŞ BURASI
-        // Firebase'de hem 'puanDurumu' hem 'lig_durumu' var, ikisine de bak diyoruz
-        const tazePuan = data.puanDurumu || data.lig_durumu || [];
-        const tazeFikstur = data.super_lig_fikstur || data.fikstur || [];
-
-        setPuanDurumu(tazePuan);
-        setFikstur(tazeFikstur);
-        
-        // Diğerleri zaten sende var, kontrol et yeter
-        if (data.gazeteMansetleri) setGazeteler(data.gazeteMansetleri);
-        if (data.filmler) setFilmler(data.filmler);
-        if (data.etkinlikler) setEtkinlikler(data.etkinlikler);
-        if (data.kur_bilgileri) setKurVerileri(data.kur_bilgileri);
-      }
+    // 5. YEREL SPOR SORGUSU (Bağımsız - Kategori listesinde YEREL SPOR olan son 8 haber)
+    const qYerelSpor = query(collection(db, "haberler"), where("kategoriler", "array-contains", "YEREL SPOR"), orderBy("tarih", "desc"), limit(8));
+    const unsubscribeYerelSpor = onSnapshot(qYerelSpor, (snapshot) => {
+      setYerelSporHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubscribeHaber(); unsubscribeDikey(); unsubHizmetler(); };
-  }, []);
+    // 6. SPOR SLIDER SORGUSU (Bağımsız - Kategori listesinde SPOR olan son 30 haber)
+    const qSporSlider = query(collection(db, "haberler"), where("kategoriler", "array-contains", "SPOR"), orderBy("tarih", "desc"), limit(30));
+    const unsubscribeSporSlider = onSnapshot(qSporSlider, (snapshot) => {
+      setSporSliderHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
-  // KANKA: Ana filtreleme fonksiyonu artık diziyi tarıyor
-  const getKat = (kat: string, l: number = 10) => 
-haberler.filter(h => {
-  const aranan = kat.toUpperCase().trim();
-  
-  const kategorilerDizisi = Array.isArray(h.kategoriler) 
-    ? h.kategoriler.map((x:any) => x.toUpperCase().trim()) 
-    : [ (h.kategori || "").toUpperCase().trim() ];
+    // 7. HAYATIN İÇİNDEN SORGUSU (Bağımsız - Kategori listesinde HAYATIN İÇİNDEN olan son 12 haber)
+    const qHayat = query(collection(db, "haberler"), where("kategoriler", "array-contains", "HAYATIN İÇİNDEN"), orderBy("tarih", "desc"), limit(12));
+    const unsubscribeHayat = onSnapshot(qHayat, (snapshot) => {
+      setHayatinIcindenHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
-  return kategorilerDizisi.includes(aranan);
-}).slice(0, l);
+    // DİKEY VİDEOLAR (Mevcut yapı, kalsın)
+    const qDikey = query(collection(db, "dikey_videolar"), orderBy("tarih", "desc"), limit(20));
+    const unsubscribeDikey = onSnapshot(qDikey, (snapshot) => {
+      setDikeyVideolar(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
-  const sliderHaberler = haberler.filter(h => h.sliderEkle).length > 0 ? haberler.filter(h => h.sliderEkle) : haberler.slice(0, 20);
-  const sonDakikaHaberleri = haberler.filter(h => h.sonDakika);
-  const trendHaberler = haberler.filter(h => h.trendEkle).slice(0, 6);
-  const mansetSutun = haberler
-  .filter(h => h.mansetEkle === true) // Sadece Manşet damgasına bak diyoruz
-  .sort((a, b) => b.tarih - a.tarih) // En taze manşeti başa al
-  .slice(0, 8); // Tam 8 kutuluk yerimiz var
-  
-  // HAYATIN İÇİNDEN
-  const hayatinIcindenHaberler = getKat("HAYATIN İÇİNDEN", 12);
+    // AYARLAR VE DİĞERLERİ (Mevcut yapı, kalsın)
+    getDoc(doc(db, "ayarlar", "genel")).then(docSnap => {
+      if (docSnap.exists()) setSiteAyarlari(docSnap.data());
+    });
 
-  // KANKA: SPOR SLIDER (Genel Spor Etiketi olanları çeker)
-  const sporSliderData = haberler.filter(h => 
-  h.kategoriler?.some(k => k.trim().toUpperCase() === "SPOR")
-).slice(0, 10);
+    const unsubHizmetler = onSnapshot(doc(db, "ayarlar", "hizmetler"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const tazePuan = data.puanDurumu || data.lig_durumu || [];
+        const tazeFikstur = data.super_lig_fikstur || data.fikstur || [];
+        setPuanDurumu(tazePuan);
+        setFikstur(tazeFikstur);
+        if (data.gazeteMansetleri) setGazeteler(data.gazeteMansetleri);
+        if (data.filmler) setFilmler(data.filmler);
+        if (data.etkinlikler) setEtkinlikler(data.etkinlikler);
+        if (data.kur_bilgileri) setKurVerileri(data.kur_bilgileri);
+      }
+    });
 
-  // KANKA: KOCAELİ SPOR REYONU (Sadece YEREL SPOR etiketi olanları çeker)
-  const kocaeliSporData = haberler.filter(h => 
-  h.kategoriler?.some(k => k.trim().toUpperCase() === "YEREL SPOR")
-).slice(0, 8);
-
-  if (yukleniyor) return (
-  <div className="min-h-screen bg-black flex items-center justify-center font-black italic animate-pulse text-4xl text-red-600 uppercase">
-    HABERPİK...
-  </div>
-  );
+    return () => { 
+      unsubscribeSlider(); 
+      unsubscribeSonDakika(); 
+      unsubscribeTrend(); 
+      unsubscribeMansetGrid();
+      unsubscribeYerelSpor(); 
+      unsubscribeSporSlider();
+      unsubscribeHayat();
+      unsubscribeDikey(); 
+      unsubHizmetler(); 
+    };
+  }, []);
 
   return (
   <div className="bg-gray-200 min-h-screen w-full">
@@ -201,7 +214,7 @@ haberler.filter(h => {
   // BURASI KRİTİK: premium-slider ismini sakın unutma
   className="h-full w-full premium-slider relative"
 >
-      {sliderHaberler.slice(0, 20).map((h) => (
+      {mansetHaberler.map((h) => (
         <SwiperSlide key={h.id}>
           <Link href={`/haber/${h.id}`} className="relative block h-full overflow-hidden">
             <img src={h.resim} loading="lazy" className="w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110" alt="haber"/>
@@ -257,7 +270,7 @@ haberler.filter(h => {
 
   {/* KANKA: Değişken adını mansetSutun yapmayı unutma, yukarıda tanımlamıştık */}
   <div className="grid grid-cols-4 gap-0.5">
-    {mansetSutun.map((h) => (
+    {mansetGridHaberler.map((h) => (
       <Link href={`/haber/${h.id}`} key={h.id} className="relative aspect-[5/3] group overflow-hidden bg-gray-900 border border-gray-100 shadow-sm">
         <img 
             src={h.resim} 
@@ -324,7 +337,7 @@ haberler.filter(h => {
     <div className="absolute inset-0 flex transition-transform duration-500 ease-in-out" 
          style={{ transform: `translateX(-${sliderIndex * 100}%)` }}>
       {/* KANKA: sporSliderData'yı 30 haberle sınırlıyoruz */}
-      {sporSliderData.slice(0, 30).map((h, i) => (
+      {sporSliderHaberler.map((h, i) => (
         <div key={h.id} className="min-w-full h-full relative">
            <img src={h.resim} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent flex flex-col justify-end p-8">
@@ -429,7 +442,7 @@ haberler.filter(h => {
           {/* ALT BÖLÜM: SAF KOCAELİ REYONU */}
           <div className="p-1 bg-gray-300">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-                {kocaeliSporData.map(h => (
+                {yerelSporHaberler.map(h => (
                   <Link href={`/haber/${h.id}`} key={h.id} className="relative h-60 group overflow-hidden bg-white border-b-2 border-transparent hover:border-green-600 transition-all">
                       <div className="absolute top-2 left-2 z-10 flex gap-1">
                         <span className="bg-black text-white text-[8px] font-black italic px-2 py-0.5 uppercase">YEREL SPOR</span>
@@ -646,7 +659,7 @@ haberler.filter(h => {
             className="h-full"
         >
             {/* KANKA: getKat kullanarak her kategori sepetinden en taze 15 taneyi çekiyoruz */}
-            {getKat(activeKatTab, 15).map(h => (
+            {mansetHaberler.slice(0, 15).map(h => (
                 <SwiperSlide key={h.id}>
                     <Link href={`/haber/${h.id}`} className="relative block h-full group overflow-hidden">
                         <img 
