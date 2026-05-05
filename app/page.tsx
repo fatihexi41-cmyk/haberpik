@@ -41,6 +41,8 @@ export default function Home() {
   const [hayatinIcindenHaberler, setHayatinIcindenHaberler] = useState<any[]>([]);
   const [sporSliderHaberler, setSporSliderHaberler] = useState<any[]>([]);
   const [mansetGridHaberler, setMansetGridHaberler] = useState<any[]>([]);
+  const [ekonomiHaberler, setEkonomiHaberler] = useState<any[]>([]);
+  const [gundemHaberler, setGundemHaberler] = useState<any[]>([]);
 
   useEffect(() => {
     // 1. ANA SLIDER SORGUSU (Bağımsız - Sadece Slider Ekle seçilenler veya en son 20 haber)
@@ -86,6 +88,18 @@ export default function Home() {
       setHayatinIcindenHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // 8. EKONOMİ SORGUSU (Bağımsız - Kategori listesinde EKONOMİ olan son 12 haber)
+const qEkonomi = query(collection(db, "haberler"), where("kategoriler", "array-contains", "EKONOMİ"), orderBy("tarih", "desc"), limit(12));
+const unsubscribeEkonomi = onSnapshot(qEkonomi, (snapshot) => {
+  setEkonomiHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+});
+
+// 9. GÜNDEM SORGUSU (Bağımsız - Kategori listesinde GÜNDEM olan son 16 haber)
+const qGundem = query(collection(db, "haberler"), where("kategoriler", "array-contains", "GÜNDEM"), orderBy("tarih", "desc"), limit(16));
+const unsubscribeGundem = onSnapshot(qGundem, (snapshot) => {
+  setGundemHaberler(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+});
+
     // DİKEY VİDEOLAR (Mevcut yapı, kalsın)
     const qDikey = query(collection(db, "dikey_videolar"), orderBy("tarih", "desc"), limit(20));
     const unsubscribeDikey = onSnapshot(qDikey, (snapshot) => {
@@ -121,6 +135,8 @@ export default function Home() {
       unsubscribeHayat();
       unsubscribeDikey(); 
       unsubHizmetler(); 
+      unsubscribeEkonomi();
+      unsubscribeGundem();
     };
   }, []);
 
@@ -467,38 +483,30 @@ export default function Home() {
         </Link>
     </div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-        {/* KANKA: Ortak havuz dokunuşu yapıldı, yapı bozulmadı */}
-        {haberler && haberler
-            .filter(h => {
-                // Haberin kategorilerini dizi yapıp temizliyoruz ki botun ID hatası patlamasın
-                const katlar = Array.isArray(h.kategoriler) 
-                    ? h.kategoriler.map((k: any) => k.toUpperCase().trim()) 
-                    : [(h.kategori || "").toUpperCase().trim()];
-
-                // Siyaset, Asayiş veya Gündem etiketlerinden biri varsa vitrine girer
-                return katlar.includes("GÜNDEM") || 
-                       katlar.includes("ASAYİŞ") || 
-                       katlar.includes("SİYASET") ||
-                       katlar.includes("KOCAELİ GÜNDEMİ");
-            })
-            .slice(0, 16) // En taze 16 haber
-            .map(h => (
-                <Link href={`/haber/${h.id}`} key={h.id} className="relative group aspect-[4/3] overflow-hidden">
-                    <img 
-                        src={h.resim} 
-                        loading="lazy" 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" 
-                        alt={h.baslik}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-3">
-                        <h4 className="text-white text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">
-                            {h.baslik}
-                        </h4>
-                    </div>
-                </Link>
-            ))
-        }
-    </div>
+    {/* KANKA: Artık filtreleme ile uğraşmıyoruz, gundemHaberler zaten filtrelenmiş geliyor */}
+    {gundemHaberler && gundemHaberler.length > 0 ? (
+        gundemHaberler.map(h => (
+            <Link href={`/haber/${h.id}`} key={h.id} className="relative group aspect-[4/3] overflow-hidden">
+                <img 
+                    src={h.resim} 
+                    loading="lazy" 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" 
+                    alt={h.baslik}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-3">
+                    <h4 className="text-white text-[11px] font-black uppercase italic line-clamp-2 tracking-tighter">
+                        {h.baslik}
+                    </h4>
+                </div>
+            </Link>
+        ))
+    ) : (
+        /* KANKA: Eğer haber yoksa kullanıcıya boş ekran göstermeyelim */
+        <div className="col-span-full py-10 text-center text-gray-500 font-black italic uppercase animate-pulse">
+            Gündem Haberleri Yükleniyor...
+        </div>
+    )}
+</div>
 </section>
 
       {/* 6. GAZETELER - KANKA: PREMİUM VE HATASIZ VERSİYON */}
@@ -610,26 +618,30 @@ export default function Home() {
         </Link>
     </div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-0.5">
-        {/* KANKA: Sadece Ekonomi kategorisindeki en taze haberler burada akar */}
-        {haberler && haberler
-            .filter(h => {
-                const katlar = Array.isArray(h.kategoriler) 
-                    ? h.kategoriler.map((k: any) => k.toUpperCase().trim()) 
-                    : [(h.kategori || "").toUpperCase().trim()];
-
-                return katlar.includes("EKONOMİ");
-            })
-            .slice(0, 12)
-            .map(h => (
-                <Link href={`/haber/${h.id}`} key={h.id} className="relative h-32 group overflow-hidden border border-gray-100">
-                    <img src={h.resim} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={h.baslik} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-2">
-                        <h4 className="text-white text-[10px] font-black uppercase italic line-clamp-2">{h.baslik}</h4>
-                    </div>
-                </Link>
-            ))
-        }
-    </div>
+    {/* KANKA: Artık genel torbayı (haberler) değil, ekonomi özel timini kullanıyoruz */}
+    {ekonomiHaberler && ekonomiHaberler.length > 0 ? (
+        ekonomiHaberler.map(h => (
+            <Link href={`/haber/${h.id}`} key={h.id} className="relative h-32 group overflow-hidden border border-gray-100">
+                <img 
+                    src={h.resim} 
+                    loading="lazy" 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                    alt={h.baslik} 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black flex items-end p-2">
+                    <h4 className="text-white text-[10px] font-black uppercase italic line-clamp-2">
+                        {h.baslik}
+                    </h4>
+                </div>
+            </Link>
+        ))
+    ) : (
+        /* KANKA: Veri yoksa boş kalmasın, yükleniyor mühürünü basalım */
+        <div className="col-span-full py-10 text-center text-blue-900 font-black italic uppercase animate-pulse">
+            Ekonomi Verileri Yükleniyor...
+        </div>
+    )}
+</div>
 </section>
 
       {/* 8. DEV TAB SLIDER - KANKA: 4 KATEGORİ ÖZEL FİLTRE BAĞLANDI */}
