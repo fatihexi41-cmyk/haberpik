@@ -1,47 +1,95 @@
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Metadata } from "next";
+import { notFound } from "next/navigation";
 import HaberDetayClient from "./HaberDetayClient";
 
-// KANKA: Next.js 15+ için params tipini Promise olarak tanımlıyoruz
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-// 1. SEO MÜHÜRÜ (GOOGLE BURAYI OKUR)
+// ─── SEO META ────────────────────────────────────────────────────────────────
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params; // KANKA: Promise'i burada bekleyip açıyoruz (await)
-
+  const { id } = await params;
   if (!id) return { title: "Haber Bulunamadı | HABERPİK" };
 
   try {
-    const docRef = doc(db, "haberler", id);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-      return { title: "Haber Bulunamadı | HABERPİK" };
-    }
+    const docSnap = await getDoc(doc(db, "haberler", id));
+    if (!docSnap.exists()) return { title: "Haber Bulunamadı | HABERPİK" };
 
     const haber = docSnap.data();
+    const aciklama = haber.metaAciklama || haber.ozet || "";
+    const resim = haber.resim || "https://www.haberpik.com/og-image.jpg";
 
     return {
       title: `${haber.baslik} | HABERPİK`,
-      description: haber.metaAciklama || haber.ozet,
+      description: aciklama,
+
+      // DÜZELTİLDİ: canonical URL eklendi
+      alternates: {
+        canonical: `https://www.haberpik.com/haber/${id}`,
+      },
+
       openGraph: {
-        images: [haber.resim],
+        type: "article",                         // DÜZELTİLDİ: "website" yerine "article"
+        url: `https://www.haberpik.com/haber/${id}`,
         title: haber.baslik,
-        description: haber.ozet,
+        description: aciklama,
+        siteName: "HABERPİK",
+        locale: "tr_TR",
+        images: [{ url: resim, width: 1200, height: 630, alt: haber.baslik }],
+        // DÜZELTİLDİ: Yayın tarihi varsa ekle
+        publishedTime: haber.tarih?.seconds
+          ? new Date(haber.tarih.seconds * 1000).toISOString()
+          : undefined,
+      },
+
+      twitter: {
+        card: "summary_large_image",
+        title: haber.baslik,
+        description: aciklama,
+        images: [resim],
+      },
+
+      // DÜZELTİLDİ: schema.org NewsArticle yapılandırılmış verisi
+      other: {
+        "application/ld+json": JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "NewsArticle",
+          "headline": haber.baslik,
+          "description": aciklama,
+          "image": resim,
+          "url": `https://www.haberpik.com/haber/${id}`,
+          "datePublished": haber.tarih?.seconds
+            ? new Date(haber.tarih.seconds * 1000).toISOString()
+            : new Date().toISOString(),
+          "publisher": {
+            "@type": "Organization",
+            "name": "HABERPİK",
+            "url": "https://www.haberpik.com",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://www.haberpik.com/logo.png",
+            },
+          },
+          "author": {
+            "@type": "Person",
+            "name": haber.yazar || "HABERPİK Editör",
+          },
+        }),
       },
     };
-  } catch (error) {
+  } catch {
     return { title: "Haber Detayı | HABERPİK" };
   }
 }
 
-// 2. KULLANICI GÖSTERİMİ (TASARIM BURADAN GELİR)
+// ─── SAYFA ───────────────────────────────────────────────────────────────────
 export default async function Page({ params }: Props) {
-  const { id } = await params; // KANKA: Burada da id'yi açtık
+  const { id } = await params;
 
-  // Artık id'yi Client Component'e aslanlar gibi gönderiyoruz
+  // DÜZELTİLDİ: id yoksa 404 sayfasına yönlendir
+  if (!id) notFound();
+
   return <HaberDetayClient id={id} />;
 }

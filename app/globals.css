@@ -20,6 +20,37 @@
   }
 }
 
+/* ─── MARQUEE ANİMASYONU (Son Dakika Bandı) ─────────────────────────────── */
+/* page.tsx'teki style jsx kaldırıldı, buraya taşındı */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: inline-flex;
+  animation: marquee 60s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ─── SCROLLBAR GİZLE ────────────────────────────────────────────────────── */
+/* Navbar, menü, swiper gibi yatay/dikey kaydırmalı alanlarda */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── ÖZEL SCROLLBAR (Etkinlik & Gazete Modal) ──────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #dc2626;
+  border-radius: 2px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #b91c1c; }
+
+/* ─── SWIPER PREMIUM SLIDER (Ana Manşet) ────────────────────────────────── */
 /* HABERPİK KESİN ÇÖZÜM: BURAYI HİÇ BOZMUYORUZ ÇÜNKÜ ÇALIŞTI! */
 .premium-slider .swiper-pagination {
   bottom: 30px !important;
@@ -33,8 +64,8 @@
 .custom-bullet {
   width: 28px !important;
   height: 28px !important;
-  background-color: #ffffff !important; 
-  color: #000000 !important;          
+  background-color: #ffffff !important;
+  color: #000000 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -47,9 +78,27 @@
 }
 
 .swiper-pagination-bullet-active.custom-bullet {
-  background-color: #dc2626 !important; 
+  background-color: #dc2626 !important;
   color: #ffffff !important;
 }
+
+/* ─── SWIPER OK BUTONLARI (Gazete Slider) ───────────────────────────────── */
+.gazete-swiper .swiper-button-next,
+.gazete-swiper .swiper-button-prev {
+  color: #ffffff !important;
+  background: rgba(220, 38, 38, 0.8) !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+}
+
+.gazete-swiper .swiper-button-next::after,
+.gazete-swiper .swiper-button-prev::after {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+/* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 .dark body {
   background-color: #111 !important;
 }
@@ -59,4 +108,52 @@
 }
 .dark .bg-gray-200 {
   background-color: #111 !important;
+}
+.dark .bg-gray-100 {
+  background-color: #222 !important;
+}
+.dark .text-gray-900 {
+  color: #f1f1f1 !important;
+}
+.dark .border-gray-300 {
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* ─── SPOR FUTBOL İKONU DÖNDÜRME ─────────────────────────────────────────── */
+/* layout.tsx'te animate-spin-slow kullanılıyor */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+/* ─── HABER DETAY İÇERİĞİ ────────────────────────────────────────────────── */
+/* HaberDetayClient.tsx'teki style jsx global buraya taşındı */
+.haber-metni p { margin-bottom: 2rem; }
+.haber-metni strong { font-weight: 900; color: #000; }
+.haber-metni img { width: 100%; height: auto; border-radius: 4px; margin: 1.5rem 0; }
+.haber-metni h2,
+.haber-metni h3 {
+  font-weight: 900;
+  text-transform: uppercase;
+  font-style: italic;
+  margin-top: 2.5rem;
+  margin-bottom: 1.5rem;
+  color: #dc2626;
+  border-bottom: 2px solid #f3f4f6;
+  padding-bottom: 0.5rem;
+}
+.haber-metni ul,
+.haber-metni ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1.5rem;
+  list-style-type: disc;
+  font-style: italic;
+  font-weight: bold;
+}
+.haber-metni a {
+  color: #dc2626;
+  text-decoration: underline;
 }
